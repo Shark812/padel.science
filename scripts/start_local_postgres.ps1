@@ -1,7 +1,8 @@
 $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
-docker compose -f "$root\docker-compose.yml" up -d postgres 2>&1 | Out-Host
+$composeFile = Join-Path $root "docker-compose.yml"
+cmd /c "docker compose -f ""$composeFile"" up -d postgres >nul 2>nul"
 if ($LASTEXITCODE -ne 0) {
     throw "Failed to start postgres container."
 }

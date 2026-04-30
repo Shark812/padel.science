@@ -2,7 +2,8 @@ $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
 
-docker compose -f "$root\docker-compose.yml" up -d postgres *> $null
+$composeFile = Join-Path $root "docker-compose.yml"
+cmd /c "docker compose -f ""$composeFile"" up -d postgres >nul 2>nul"
 if ($LASTEXITCODE -ne 0) {
     throw "Failed to start postgres container."
 }
@@ -15,7 +16,7 @@ for ($i = 0; $i -lt 30; $i++) {
     Start-Sleep -Seconds 2
 }
 
-docker exec -i padel-postgres psql -U padel -d padel -f /workspace/db/sql/refresh_unified.sql 2>&1 | Out-Host
+cmd /c "docker exec -i padel-postgres psql -U padel -d padel -f /workspace/db/sql/refresh_unified.sql"
 if ($LASTEXITCODE -ne 0) {
     throw "Failed to refresh PostgreSQL from unified dataset."
 }

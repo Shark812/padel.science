@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS app.rackets (
     feel TEXT,
     weight_raw TEXT,
     image_source_recommended TEXT,
+    image_url TEXT,
+    image_source_portal TEXT,
     overall_rating_avg NUMERIC(6,3),
     power_avg NUMERIC(6,3),
     control_avg NUMERIC(6,3),
@@ -59,4 +61,3 @@ CREATE INDEX IF NOT EXISTS idx_rackets_year ON app.rackets(year);
 CREATE INDEX IF NOT EXISTS idx_rackets_reliability_score ON app.rackets(reliability_score);
 CREATE INDEX IF NOT EXISTS idx_rackets_source_count ON app.rackets(source_count);
 CREATE INDEX IF NOT EXISTS idx_racket_sources_portal ON app.racket_sources(source_portal);
-

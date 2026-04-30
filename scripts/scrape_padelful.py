@@ -9,6 +9,7 @@ import re
 import time
 from pathlib import Path
 from typing import Any
+from urllib.parse import urljoin
 
 import requests
 
@@ -85,6 +86,14 @@ def parse_json_ld(page_html: str) -> dict[str, Any]:
     return {}
 
 
+def normalize_image_url(image: Any, page_url: str) -> str | None:
+    if isinstance(image, list):
+        image = image[0] if image else None
+    if not image or not isinstance(image, str):
+        return None
+    return urljoin(page_url, image.strip())
+
+
 def extract_metrics(page_html: str) -> dict[str, float]:
     metric_name_map = {
         "Power": "power",
@@ -125,6 +134,7 @@ def parse_product(session: requests.Session, url: str) -> dict[str, Any]:
         "slug": slug_from_url(url),
         "name": product_json.get("name"),
         "brand": brand.get("name"),
+        "image_url": normalize_image_url(product_json.get("image"), url),
         "description": product_json.get("description"),
         "published_at": review.get("datePublished"),
         "overall_rating": parse_float(str(rating.get("ratingValue"))) if rating.get("ratingValue") is not None else None,
@@ -170,6 +180,7 @@ def summarize(records: list[dict[str, Any]]) -> dict[str, Any]:
         "products": len(records),
         "with_name": filled("name"),
         "with_brand": filled("brand"),
+        "with_image_url": filled("image_url"),
         "with_overall_rating": filled("overall_rating"),
         "with_power": filled("power"),
         "with_control": filled("control"),

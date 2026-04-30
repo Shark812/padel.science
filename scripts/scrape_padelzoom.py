@@ -10,6 +10,7 @@ import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
+from urllib.parse import urljoin
 
 import requests
 
@@ -84,6 +85,14 @@ def parse_json_ld(page_html: str) -> dict[str, Any]:
     return {}
 
 
+def normalize_image_url(image: Any, page_url: str) -> str | None:
+    if isinstance(image, list):
+        image = image[0] if image else None
+    if not image or not isinstance(image, str):
+        return None
+    return urljoin(page_url, image.strip())
+
+
 def extract_scores(page_html: str) -> dict[str, float]:
     score_name_map = {
         "Potencia": "power",
@@ -147,6 +156,7 @@ def parse_product(session: requests.Session, url: str) -> dict[str, Any]:
         "slug": slug_from_url(url),
         "name": product_json.get("name"),
         "brand": brand_name,
+        "image_url": normalize_image_url(product_json.get("image"), url),
         "currency": offers.get("priceCurrency"),
         "price_low_eur": parse_float(str(offers.get("lowPrice"))) if offers.get("lowPrice") not in (None, "") else None,
         "price_high_eur": parse_float(str(offers.get("highPrice"))) if offers.get("highPrice") not in (None, "") else None,
@@ -196,6 +206,7 @@ def summarize(records: list[dict[str, Any]]) -> dict[str, Any]:
     summary_fields = [
         "name",
         "brand",
+        "image_url",
         "overall_rating",
         "power",
         "control",

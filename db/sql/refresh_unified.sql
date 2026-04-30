@@ -1,5 +1,8 @@
 BEGIN;
 
+ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS image_url TEXT;
+ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS image_source_portal TEXT;
+
 TRUNCATE TABLE app.racket_sources, app.rackets, app.brands RESTART IDENTITY CASCADE;
 
 CREATE TEMP TABLE staging_unified (
@@ -20,6 +23,8 @@ CREATE TEMP TABLE staging_unified (
     feel TEXT,
     weight_raw TEXT,
     image_source_recommended TEXT,
+    image_url TEXT,
+    image_source_portal TEXT,
     overall_rating_avg TEXT,
     power_avg TEXT,
     control_avg TEXT,
@@ -81,6 +86,8 @@ INSERT INTO app.rackets (
     feel,
     weight_raw,
     image_source_recommended,
+    image_url,
+    image_source_portal,
     overall_rating_avg,
     power_avg,
     control_avg,
@@ -118,6 +125,8 @@ SELECT
     NULLIF(s.feel, ''),
     NULLIF(s.weight_raw, ''),
     NULLIF(s.image_source_recommended, ''),
+    NULLIF(s.image_url, ''),
+    NULLIF(s.image_source_portal, ''),
     NULLIF(s.overall_rating_avg, '')::NUMERIC(6,3),
     NULLIF(s.power_avg, '')::NUMERIC(6,3),
     NULLIF(s.control_avg, '')::NUMERIC(6,3),
@@ -155,6 +164,8 @@ INSERT INTO app.rackets (
     feel,
     weight_raw,
     image_source_recommended,
+    image_url,
+    image_source_portal,
     overall_rating_avg,
     power_avg,
     control_avg,
@@ -192,6 +203,8 @@ SELECT
     NULLIF(s.feel, ''),
     NULLIF(s.weight_raw, ''),
     NULLIF(s.image_source_recommended, ''),
+    NULLIF(s.image_url, ''),
+    NULLIF(s.image_source_portal, ''),
     NULLIF(s.overall_rating_avg, '')::NUMERIC(6,3),
     NULLIF(s.power_avg, '')::NUMERIC(6,3),
     NULLIF(s.control_avg, '')::NUMERIC(6,3),
