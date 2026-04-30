@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = [
-    ("scrape_padelreference.py", ["--outdir", str(ROOT / "data/padelreference-en-full")]),
+    ("scrape_padelreference.py", ["--lang", "en", "--outdir", str(ROOT / "data/padelreference-en-full")]),
     ("scrape_extreme_tennis.py", ["--outdir", str(ROOT / "data/extreme-tennis-en-full")]),
     ("scrape_padelful.py", ["--outdir", str(ROOT / "data/padelful-en-full")]),
     ("scrape_pala_hack.py", ["--outdir", str(ROOT / "data/pala-hack-en-full")]),
