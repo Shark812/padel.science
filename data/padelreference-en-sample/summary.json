@@ -1,0 +1,20 @@
+{
+  "products": 20,
+  "valid_product_pages": 6,
+  "with_brand": 6,
+  "with_price": 6,
+  "with_shape": 6,
+  "with_weight": 5,
+  "with_balance": 6,
+  "with_surface": 5,
+  "with_core": 0,
+  "with_level": 0,
+  "with_technologies": 0,
+  "with_expert_notes": 6,
+  "with_power": 6,
+  "with_control": 6,
+  "with_comfort": 6,
+  "with_maneuverability": 6,
+  "with_effect": 6,
+  "with_tolerance": 6
+}

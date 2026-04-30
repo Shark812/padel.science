@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: padel-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: padel
+      POSTGRES_USER: padel
+      POSTGRES_PASSWORD: padel
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db:/workspace/db
+      - ./data:/workspace/data
+      - ./db/init:/docker-entrypoint-initdb.d
+
+volumes:
+  postgres_data:
