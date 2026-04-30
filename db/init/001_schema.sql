@@ -26,6 +26,9 @@ CREATE TABLE IF NOT EXISTS app.rackets (
     level TEXT,
     feel TEXT,
     weight_raw TEXT,
+    core_material TEXT,
+    face_material TEXT,
+    frame_material TEXT,
     image_source_recommended TEXT,
     image_url TEXT,
     image_source_portal TEXT,
@@ -46,6 +49,19 @@ CREATE TABLE IF NOT EXISTS app.rackets (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS shape TEXT;
+ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS balance TEXT;
+ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS surface TEXT;
+ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS level TEXT;
+ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS feel TEXT;
+ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS weight_raw TEXT;
+ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS core_material TEXT;
+ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS face_material TEXT;
+ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS frame_material TEXT;
+ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS image_source_recommended TEXT;
+ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS image_url TEXT;
+ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS image_source_portal TEXT;
 
 CREATE TABLE IF NOT EXISTS app.racket_sources (
     id BIGSERIAL PRIMARY KEY,
@@ -132,7 +148,12 @@ CREATE INDEX IF NOT EXISTS idx_racket_sources_name_trgm
 ON app.racket_sources
 USING gin (source_name gin_trgm_ops);
 
-CREATE OR REPLACE VIEW app.rackets_enriched AS
+DROP FUNCTION IF EXISTS app.compare_rackets(TEXT[]);
+DROP FUNCTION IF EXISTS app.search_rackets(TEXT, SMALLINT, TEXT, INTEGER, INTEGER);
+DROP FUNCTION IF EXISTS app.get_racket_detail(TEXT);
+DROP VIEW IF EXISTS app.rackets_enriched;
+
+CREATE VIEW app.rackets_enriched AS
 SELECT
     r.id,
     r.unified_id,
@@ -152,6 +173,9 @@ SELECT
     r.level,
     r.feel,
     r.weight_raw,
+    r.core_material,
+    r.face_material,
+    r.frame_material,
     r.image_source_recommended,
     r.image_url,
     r.image_source_portal,
@@ -175,7 +199,7 @@ FROM app.rackets r
 JOIN app.brands b
   ON b.id = r.brand_id;
 
-CREATE OR REPLACE FUNCTION app.search_rackets(
+CREATE FUNCTION app.search_rackets(
     p_query TEXT DEFAULT NULL,
     p_min_reliability SMALLINT DEFAULT NULL,
     p_brand_slug TEXT DEFAULT NULL,
@@ -232,7 +256,7 @@ AS $$
     LIMIT GREATEST(COALESCE(p_limit, 50), 1);
 $$;
 
-CREATE OR REPLACE FUNCTION app.get_racket_detail(
+CREATE FUNCTION app.get_racket_detail(
     p_unified_id TEXT
 )
 RETURNS TABLE (
@@ -251,6 +275,9 @@ RETURNS TABLE (
     level TEXT,
     feel TEXT,
     weight_raw TEXT,
+    core_material TEXT,
+    face_material TEXT,
+    frame_material TEXT,
     overall_rating_avg NUMERIC(6,3),
     power_avg NUMERIC(6,3),
     control_avg NUMERIC(6,3),
@@ -286,6 +313,9 @@ AS $$
         re.level,
         re.feel,
         re.weight_raw,
+        re.core_material,
+        re.face_material,
+        re.frame_material,
         re.overall_rating_avg,
         re.power_avg,
         re.control_avg,
@@ -320,7 +350,7 @@ AS $$
     WHERE re.unified_id = p_unified_id;
 $$;
 
-CREATE OR REPLACE FUNCTION app.compare_rackets(
+CREATE FUNCTION app.compare_rackets(
     p_unified_ids TEXT[]
 )
 RETURNS TABLE (

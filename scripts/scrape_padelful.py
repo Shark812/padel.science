@@ -28,6 +28,12 @@ METRIC_PATTERN = re.compile(
     r'<span class="text-sm font-bold tabular-nums text-neutral-800">([^<]+)</span>',
     re.DOTALL | re.IGNORECASE,
 )
+SPEC_CARD_PATTERN = re.compile(
+    r'<div class="rounded-lg border border-border bg-card p-6">\s*'
+    r'<p class="text-lg font-bold">([^<]+)</p>\s*'
+    r'<p class="text-sm">([^<]+)</p>\s*</div>',
+    re.DOTALL | re.IGNORECASE,
+)
 
 
 def build_session() -> requests.Session:
@@ -116,6 +122,27 @@ def extract_metrics(page_html: str) -> dict[str, float]:
     return metrics
 
 
+def extract_specs(page_html: str) -> dict[str, str]:
+    spec_name_map = {
+        "Shape": "shape",
+        "Weight": "weight_raw",
+        "Touch": "feel",
+        "Core": "core_material",
+        "Faces": "face_material",
+        "Frame": "frame_material",
+    }
+    specs: dict[str, str] = {}
+    pretty_html = page_html.replace("><", ">\n<")
+    for label, raw_value in SPEC_CARD_PATTERN.findall(pretty_html):
+        key = spec_name_map.get(html.unescape(label).strip())
+        if not key:
+            continue
+        value = html.unescape(raw_value).strip()
+        if value:
+            specs[key] = value
+    return specs
+
+
 def slug_from_url(url: str) -> str:
     return url.rstrip("/").rsplit("/", 1)[-1]
 
@@ -124,6 +151,7 @@ def parse_product(session: requests.Session, url: str) -> dict[str, Any]:
     page_html = fetch_text(session, url)
     product_json = parse_json_ld(page_html)
     metrics = extract_metrics(page_html)
+    specs = extract_specs(page_html)
     review = product_json.get("review", {}) if isinstance(product_json, dict) else {}
     rating = review.get("reviewRating", {}) if isinstance(review, dict) else {}
     brand = product_json.get("brand", {}) if isinstance(product_json.get("brand"), dict) else {}
@@ -137,6 +165,12 @@ def parse_product(session: requests.Session, url: str) -> dict[str, Any]:
         "image_url": normalize_image_url(product_json.get("image"), url),
         "description": product_json.get("description"),
         "published_at": review.get("datePublished"),
+        "shape": specs.get("shape"),
+        "weight_raw": specs.get("weight_raw"),
+        "feel": specs.get("feel"),
+        "core_material": specs.get("core_material"),
+        "face_material": specs.get("face_material"),
+        "frame_material": specs.get("frame_material"),
         "overall_rating": parse_float(str(rating.get("ratingValue"))) if rating.get("ratingValue") is not None else None,
         "power": metrics.get("power"),
         "control": metrics.get("control"),
@@ -181,6 +215,12 @@ def summarize(records: list[dict[str, Any]]) -> dict[str, Any]:
         "with_name": filled("name"),
         "with_brand": filled("brand"),
         "with_image_url": filled("image_url"),
+        "with_shape": filled("shape"),
+        "with_weight_raw": filled("weight_raw"),
+        "with_feel": filled("feel"),
+        "with_core_material": filled("core_material"),
+        "with_face_material": filled("face_material"),
+        "with_frame_material": filled("frame_material"),
         "with_overall_rating": filled("overall_rating"),
         "with_power": filled("power"),
         "with_control": filled("control"),

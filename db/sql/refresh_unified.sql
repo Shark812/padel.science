@@ -2,6 +2,9 @@ BEGIN;
 
 ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS image_url TEXT;
 ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS image_source_portal TEXT;
+ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS core_material TEXT;
+ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS face_material TEXT;
+ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS frame_material TEXT;
 
 TRUNCATE TABLE app.racket_sources, app.rackets, app.brands RESTART IDENTITY CASCADE;
 
@@ -22,6 +25,9 @@ CREATE TEMP TABLE staging_unified (
     level TEXT,
     feel TEXT,
     weight_raw TEXT,
+    core_material TEXT,
+    face_material TEXT,
+    frame_material TEXT,
     image_source_recommended TEXT,
     image_url TEXT,
     image_source_portal TEXT,
@@ -85,6 +91,9 @@ INSERT INTO app.rackets (
     level,
     feel,
     weight_raw,
+    core_material,
+    face_material,
+    frame_material,
     image_source_recommended,
     image_url,
     image_source_portal,
@@ -124,6 +133,9 @@ SELECT
     NULLIF(s.level, ''),
     NULLIF(s.feel, ''),
     NULLIF(s.weight_raw, ''),
+    NULLIF(s.core_material, ''),
+    NULLIF(s.face_material, ''),
+    NULLIF(s.frame_material, ''),
     NULLIF(s.image_source_recommended, ''),
     NULLIF(s.image_url, ''),
     NULLIF(s.image_source_portal, ''),
@@ -163,6 +175,9 @@ INSERT INTO app.rackets (
     level,
     feel,
     weight_raw,
+    core_material,
+    face_material,
+    frame_material,
     image_source_recommended,
     image_url,
     image_source_portal,
@@ -202,6 +217,9 @@ SELECT
     NULLIF(s.level, ''),
     NULLIF(s.feel, ''),
     NULLIF(s.weight_raw, ''),
+    NULLIF(s.core_material, ''),
+    NULLIF(s.face_material, ''),
+    NULLIF(s.frame_material, ''),
     NULLIF(s.image_source_recommended, ''),
     NULLIF(s.image_url, ''),
     NULLIF(s.image_source_portal, ''),

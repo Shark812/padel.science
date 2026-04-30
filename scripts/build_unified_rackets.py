@@ -690,6 +690,10 @@ def cluster_to_row(cluster: Cluster) -> dict[str, Any]:
         "feel": most_common_value(all_source_records, "feel")
         or most_common_value(all_source_records, "feel_es"),
         "weight_raw": most_common_value(all_source_records, "weight_raw"),
+        "core_material": most_common_value(all_source_records, "core_material")
+        or most_common_value(all_source_records, "core"),
+        "face_material": most_common_value(all_source_records, "face_material"),
+        "frame_material": most_common_value(all_source_records, "frame_material"),
         "image_source_recommended": image_source_recommended,
         "image_url": image_url,
         "image_source_portal": image_source_portal,
