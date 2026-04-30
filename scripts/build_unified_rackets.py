@@ -336,6 +336,31 @@ def parse_float(value: str | None) -> float | None:
         return None
 
 
+def get_normalized_rating_value(record: SourceRecord, field: str) -> float | None:
+    source = record.source
+    raw_field = field
+    if source == "extreme-tennis" and field == "overall_rating":
+        raw_field = "score"
+
+    value = parse_float(record.record.get(raw_field))
+    if value is None:
+        return None
+
+    if source == "extreme-tennis":
+        if raw_field in {
+            "score",
+            "power",
+            "control",
+            "comfort",
+            "spin",
+            "forgiveness",
+            "maneuverability",
+            "low_speed",
+        }:
+            return round(value / 10.0, 3)
+    return value
+
+
 def parse_json_array(value: str | None) -> list[str]:
     if value in (None, ""):
         return []
@@ -593,7 +618,7 @@ def choose_canonical_record(cluster: Cluster) -> SourceRecord:
 
 
 def average_numeric(records: list[SourceRecord], field: str) -> float | None:
-    values = [parse_float(record.record.get(field)) for record in records]
+    values = [get_normalized_rating_value(record, field) for record in records]
     values = [value for value in values if value is not None]
     if not values:
         return None

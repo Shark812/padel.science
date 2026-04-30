@@ -16,6 +16,11 @@ for ($i = 0; $i -lt 30; $i++) {
     Start-Sleep -Seconds 2
 }
 
+cmd /c "docker exec -i padel-postgres psql -U padel -d padel -f /workspace/db/init/001_schema.sql"
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to apply PostgreSQL schema."
+}
+
 cmd /c "docker exec -i padel-postgres psql -U padel -d padel -f /workspace/db/sql/refresh_unified.sql"
 if ($LASTEXITCODE -ne 0) {
     throw "Failed to refresh PostgreSQL from unified dataset."
