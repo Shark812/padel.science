@@ -342,6 +342,27 @@ def get_normalized_rating_value(record: SourceRecord, field: str) -> float | Non
     if source == "extreme-tennis" and field == "overall_rating":
         raw_field = "score"
 
+    if field == "sweet_spot":
+        if source == "padelreference":
+            raw_field = "tolerance"
+        elif source == "extreme-tennis":
+            raw_field = "forgiveness"
+
+    if source == "padelreference" and field == "overall_rating":
+        component_fields = [
+            "power",
+            "comfort",
+            "effect",
+            "control",
+            "maneuverability",
+            "tolerance",
+        ]
+        component_values = [parse_float(record.record.get(component)) for component in component_fields]
+        component_values = [value for value in component_values if value is not None]
+        if not component_values:
+            return None
+        return round(mean(component_values), 3)
+
     value = parse_float(record.record.get(raw_field))
     if value is None:
         return None
