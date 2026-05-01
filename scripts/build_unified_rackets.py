@@ -5,6 +5,7 @@ import argparse
 import csv
 import json
 import re
+import unicodedata
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -44,6 +45,26 @@ COMMON_TOKENS = {
     "precio",
     "puntuacion",
     "total",
+}
+GENERIC_MODEL_TOKENS = {
+    "pro",
+    "elite",
+    "lite",
+    "light",
+    "soft",
+    "hard",
+    "team",
+    "woman",
+    "junior",
+    "comfort",
+    "attack",
+    "control",
+    "power",
+    "motion",
+    "vibe",
+    "plus",
+    "one",
+    "x",
 }
 PLAYER_TOKENS = {
     "ale",
@@ -92,6 +113,10 @@ PLAYER_TOKENS = {
     "miguel",
     "lamperti",
     "coello",
+    "paula",
+    "josemaria",
+    "victoria",
+    "iglesias",
 }
 COLOR_TOKENS = {
     "black",
@@ -142,6 +167,8 @@ VARIANT_TOKENS = {
     "master",
     "reserve",
     "legend",
+    "revolution",
+    "smash",
     "superlight",
     "air",
     "go",
@@ -160,8 +187,13 @@ CRITICAL_VARIANT_TOKENS = {
     "soft",
     "hard",
     "cloud",
+    "premier",
+    "tour",
+    "final",
     "edge",
     "hrd",
+    "revolution",
+    "smash",
     "superlight",
     "motion",
     "vibe",
@@ -186,6 +218,9 @@ IMAGE_SOURCE_PRIORITY = [
     "padelzoom",
     "extreme-tennis",
 ]
+AUTO_MATCH_THRESHOLD = 0.8
+REVIEW_MATCH_CONFIDENCE_THRESHOLD = 0.9
+MISSING_MATCH_CANDIDATE_MIN = 0.55
 SOURCE_FILES = {
     "padelreference": Path("data/padelreference-en-full/padelreference.csv"),
     "extreme-tennis": Path("data/extreme-tennis-en-full/extreme-tennis.csv"),
@@ -218,7 +253,10 @@ def fix_text(value: str | None) -> str:
 
 
 def slugify_text(value: str) -> str:
-    text = fix_text(value).lower()
+    text = fix_text(value)
+    text = unicodedata.normalize("NFKD", text)
+    text = text.encode("ascii", "ignore").decode("ascii")
+    text = text.lower()
     text = re.sub(r"\b([1-9])\.(\d)\b", r" v\1\2 ", text)
     text = text.replace("+", " plus ")
     text = text.replace("&", " and ")
@@ -324,6 +362,18 @@ def token_set(tokens: list[str], drop_players: bool = False) -> set[str]:
             continue
         filtered.add(token)
     return filtered
+
+
+def is_year_token(token: str) -> bool:
+    return bool(re.fullmatch(r"20[2-3][0-9]", token))
+
+
+def is_version_token(token: str) -> bool:
+    return token in {"0", "1", "2", "3", "4", "5", "6", "v30", "v31", "v32", "v33", "v34", "v35"}
+
+
+def is_minor_series_token(token: str) -> bool:
+    return token in {"0", "1", "2", "3", "4", "5", "6", "v30", "v31", "v32", "v33", "v34", "v35"}
 
 
 def parse_float(value: str | None) -> float | None:
@@ -461,6 +511,81 @@ def is_better_record(candidate: SourceRecord, current: SourceRecord) -> bool:
     return len(candidate.name) > len(current.name)
 
 
+def variant_tokens(tokens: set[str]) -> set[str]:
+    return tokens & VARIANT_TOKENS
+
+
+def critical_variant_tokens(tokens: set[str]) -> set[str]:
+    return tokens & CRITICAL_VARIANT_TOKENS
+
+
+def identity_tokens(record: SourceRecord) -> set[str]:
+    tokens: set[str] = set()
+    for token in record.tokens_no_players:
+        if token in COMMON_TOKENS:
+            continue
+        if token in VARIANT_TOKENS:
+            continue
+        if token in GENERIC_MODEL_TOKENS:
+            continue
+        if token == record.brand:
+            continue
+        if is_year_token(token):
+            continue
+        if is_version_token(token):
+            continue
+        tokens.add(token)
+    return tokens
+
+
+def comparable_tokens(tokens: set[str]) -> set[str]:
+    filtered: set[str] = set()
+    for token in tokens:
+        if is_version_token(token):
+            continue
+        filtered.add(token)
+    return filtered
+
+
+def merge_key_tokens(record: SourceRecord) -> tuple[str, ...]:
+    tokens: list[str] = []
+    for token in sorted(record.tokens_no_players):
+        if token in COMMON_TOKENS:
+            continue
+        if token in COLOR_TOKENS:
+            continue
+        if token == record.brand:
+            continue
+        if is_minor_series_token(token) and record.year is not None:
+            continue
+        tokens.append(token)
+    return tuple(tokens)
+
+
+def aggressive_merge_key(cluster: Cluster) -> tuple[str, str, tuple[str, ...]]:
+    canonical = choose_canonical_record(cluster)
+    brand = canonical.brand or (cluster.brands.most_common(1)[0][0] if cluster.brands else "")
+    year = str(canonical.year or (cluster.years.most_common(1)[0][0] if cluster.years else ""))
+    return (brand, year, merge_key_tokens(canonical))
+
+
+def signature_blind_name_key(name: str, brand: str, year: int | None) -> tuple[str, ...]:
+    tokens: list[str] = []
+    for token in tokenize(name, brand):
+        if token in COMMON_TOKENS:
+            continue
+        if token in PLAYER_TOKENS:
+            continue
+        if token in COLOR_TOKENS:
+            continue
+        if token == brand:
+            continue
+        if year is not None and is_minor_series_token(token):
+            continue
+        tokens.append(token)
+    return tuple(sorted(set(tokens)))
+
+
 def jaccard(left: set[str], right: set[str]) -> float:
     if not left or not right:
         return 0.0
@@ -473,39 +598,110 @@ def overlap(left: set[str], right: set[str]) -> float:
     return len(left & right) / min(len(left), len(right))
 
 
+def pair_similarity_details(left: SourceRecord, right: SourceRecord) -> dict[str, Any]:
+    if left.brand and right.brand and left.brand != right.brand:
+        return {
+            "score": 0.0,
+            "reason": "brand_mismatch",
+            "score_before_penalties": 0.0,
+            "shared_tokens": [],
+            "left_only_tokens": sorted(left.tokens_no_players),
+            "right_only_tokens": sorted(right.tokens_no_players),
+            "left_variants": sorted(variant_tokens(left.tokens_no_players)),
+            "right_variants": sorted(variant_tokens(right.tokens_no_players)),
+            "left_critical": sorted(critical_variant_tokens(left.tokens_no_players)),
+            "right_critical": sorted(critical_variant_tokens(right.tokens_no_players)),
+            "penalties": ["brand_mismatch"],
+        }
+    if left.year is not None and right.year is not None and left.year != right.year:
+        return {
+            "score": 0.0,
+            "reason": "year_mismatch",
+            "score_before_penalties": 0.0,
+            "shared_tokens": [],
+            "left_only_tokens": sorted(left.tokens_no_players),
+            "right_only_tokens": sorted(right.tokens_no_players),
+            "left_variants": sorted(variant_tokens(left.tokens_no_players)),
+            "right_variants": sorted(variant_tokens(right.tokens_no_players)),
+            "left_critical": sorted(critical_variant_tokens(left.tokens_no_players)),
+            "right_critical": sorted(critical_variant_tokens(right.tokens_no_players)),
+            "penalties": ["year_mismatch"],
+        }
+
+    left_full = comparable_tokens(left.tokens)
+    right_full = comparable_tokens(right.tokens)
+    left_core = comparable_tokens(left.tokens_no_players)
+    right_core = comparable_tokens(right.tokens_no_players)
+
+    full_score = max(jaccard(left_full, right_full), overlap(left_full, right_full))
+    core_score = max(
+        jaccard(left_core, right_core),
+        overlap(left_core, right_core),
+    )
+    score = max(full_score, core_score)
+    score_before_penalties = score
+
+    left_variants = variant_tokens(left.tokens_no_players)
+    right_variants = variant_tokens(right.tokens_no_players)
+    shared_variants = left_variants & right_variants
+    left_critical = critical_variant_tokens(left.tokens_no_players)
+    right_critical = critical_variant_tokens(right.tokens_no_players)
+    left_identity = identity_tokens(left)
+    right_identity = identity_tokens(right)
+    shared_identity = left_identity & right_identity
+    penalties: list[str] = []
+
+    if left_identity and right_identity and not shared_identity:
+        score *= 0.1
+        penalties.append("identity_token_mismatch")
+    elif left_identity and right_identity and len(shared_identity) == 1:
+        if max(len(left_identity), len(right_identity)) >= 3:
+            score *= 0.65
+            penalties.append("weak_identity_overlap")
+
+    if left_critical != right_critical:
+        if left_critical and right_critical:
+            score *= 0.12
+            penalties.append("critical_variant_conflict")
+        else:
+            score *= 0.45
+            penalties.append("critical_variant_missing")
+    if left_variants != right_variants and not shared_variants:
+        score *= 0.45
+        penalties.append("variant_conflict")
+    elif left_variants != right_variants:
+        score *= 0.85
+        penalties.append("variant_partial_mismatch")
+    if ("junior" in left_variants) ^ ("junior" in right_variants):
+        score *= 0.25
+        penalties.append("junior_mismatch")
+    if ("woman" in left_variants) ^ ("woman" in right_variants):
+        score *= 0.55
+        penalties.append("woman_mismatch")
+    if left.slug and right.slug and left.slug == right.slug:
+        score = 1.0
+
+    return {
+        "score": round(score, 3),
+        "score_before_penalties": round(score_before_penalties, 3),
+        "shared_tokens": sorted(left.tokens_no_players & right.tokens_no_players),
+        "left_only_tokens": sorted(left.tokens_no_players - right.tokens_no_players),
+        "right_only_tokens": sorted(right.tokens_no_players - left.tokens_no_players),
+        "left_variants": sorted(left_variants),
+        "right_variants": sorted(right_variants),
+        "left_critical": sorted(left_critical),
+        "right_critical": sorted(right_critical),
+        "left_identity": sorted(left_identity),
+        "right_identity": sorted(right_identity),
+        "shared_identity": sorted(shared_identity),
+        "penalties": penalties,
+    }
+
+
 def record_similarity(record: SourceRecord, cluster: Cluster) -> float:
     best = 0.0
     for other in cluster.by_source.values():
-        if record.brand and other.brand and record.brand != other.brand:
-            continue
-        if record.year is not None and other.year is not None and record.year != other.year:
-            continue
-        full_score = max(jaccard(record.tokens, other.tokens), overlap(record.tokens, other.tokens))
-        core_score = max(
-            jaccard(record.tokens_no_players, other.tokens_no_players),
-            overlap(record.tokens_no_players, other.tokens_no_players),
-        )
-        score = max(full_score, core_score)
-        left_variants = record.tokens_no_players & VARIANT_TOKENS
-        right_variants = other.tokens_no_players & VARIANT_TOKENS
-        shared_variants = left_variants & right_variants
-        left_critical = record.tokens_no_players & CRITICAL_VARIANT_TOKENS
-        right_critical = other.tokens_no_players & CRITICAL_VARIANT_TOKENS
-        if left_critical != right_critical:
-            if left_critical and right_critical:
-                score *= 0.12
-            else:
-                score *= 0.45
-        if left_variants != right_variants and not shared_variants:
-            score *= 0.45
-        elif left_variants != right_variants:
-            score *= 0.85
-        if ("junior" in left_variants) ^ ("junior" in right_variants):
-            score *= 0.25
-        if ("woman" in left_variants) ^ ("woman" in right_variants):
-            score *= 0.55
-        if record.slug and other.slug and record.slug == other.slug:
-            score = 1.0
+        score = float(pair_similarity_details(record, other)["score"])
         best = max(best, score)
     return best
 
@@ -515,7 +711,7 @@ def cluster_threshold(record: SourceRecord) -> float:
         return 1.0
     if len(record.tokens_no_players) <= 5:
         return 0.9
-    return 0.8
+    return AUTO_MATCH_THRESHOLD
 
 
 def load_source_records(source: str, path: Path) -> list[SourceRecord]:
@@ -628,7 +824,55 @@ def dedupe_equivalent_clusters(clusters: list[Cluster]) -> list[Cluster]:
 
         merge_cluster_records(existing, cluster)
 
-    return ordered
+    merged_aggressive: dict[tuple[str, str, tuple[str, ...]], Cluster] = {}
+    ordered_aggressive: list[Cluster] = []
+
+    for cluster in ordered:
+        key = aggressive_merge_key(cluster)
+        existing = merged_aggressive.get(key)
+
+        if existing is None:
+            merged_aggressive[key] = cluster
+            ordered_aggressive.append(cluster)
+            continue
+
+        existing_canonical = choose_canonical_record(existing)
+        cluster_canonical = choose_canonical_record(cluster)
+        pair = pair_similarity_details(existing_canonical, cluster_canonical)
+        if "critical_variant_conflict" in pair["penalties"]:
+            ordered_aggressive.append(cluster)
+            continue
+
+        merge_cluster_records(existing, cluster)
+
+    merged_signature_blind: dict[tuple[str, str, tuple[str, ...]], Cluster] = {}
+    ordered_signature_blind: list[Cluster] = []
+
+    for cluster in ordered_aggressive:
+        canonical = choose_canonical_record(cluster)
+        brand = canonical.brand or (cluster.brands.most_common(1)[0][0] if cluster.brands else "")
+        year_value = canonical.year or (cluster.years.most_common(1)[0][0] if cluster.years else None)
+        year = str(year_value or "")
+        key = (brand, year, signature_blind_name_key(canonical.name, brand, year_value))
+        existing = merged_signature_blind.get(key)
+
+        if existing is None:
+            merged_signature_blind[key] = cluster
+            ordered_signature_blind.append(cluster)
+            continue
+
+        existing_canonical = choose_canonical_record(existing)
+        pair = pair_similarity_details(existing_canonical, canonical)
+        if any(
+            penalty in pair["penalties"]
+            for penalty in {"critical_variant_conflict", "variant_conflict", "identity_token_mismatch"}
+        ):
+            ordered_signature_blind.append(cluster)
+            continue
+
+        merge_cluster_records(existing, cluster)
+
+    return ordered_signature_blind
 
 
 def choose_canonical_record(cluster: Cluster) -> SourceRecord:
@@ -636,6 +880,48 @@ def choose_canonical_record(cluster: Cluster) -> SourceRecord:
         if source in cluster.by_source:
             return cluster.by_source[source]
     return next(iter(cluster.by_source.values()))
+
+
+def cluster_pair_details(cluster: Cluster) -> list[dict[str, Any]]:
+    records = list(cluster.by_source.values())
+    details: list[dict[str, Any]] = []
+    for idx, left in enumerate(records):
+        for right in records[idx + 1 :]:
+            pair = pair_similarity_details(left, right)
+            pair.update(
+                {
+                    "left_source": left.source,
+                    "left_name": left.name,
+                    "right_source": right.source,
+                    "right_name": right.name,
+                }
+            )
+            details.append(pair)
+    return details
+
+
+def cluster_match_confidence(cluster: Cluster) -> float:
+    details = cluster_pair_details(cluster)
+    if not details:
+        return 1.0
+    return round(min(float(detail["score"]) for detail in details), 3)
+
+
+def cluster_review_reasons(cluster: Cluster) -> list[str]:
+    reasons: list[str] = []
+    if len(cluster.by_source) == 1:
+        return reasons
+
+    confidence = cluster_match_confidence(cluster)
+    if confidence < REVIEW_MATCH_CONFIDENCE_THRESHOLD:
+        reasons.append("low_match_confidence")
+
+    pair_details = cluster_pair_details(cluster)
+    if any("critical_variant_conflict" in detail["penalties"] for detail in pair_details):
+        reasons.append("critical_variant_conflict")
+    if any("variant_conflict" in detail["penalties"] for detail in pair_details):
+        reasons.append("variant_conflict")
+    return reasons
 
 
 def average_numeric(records: list[SourceRecord], field: str) -> float | None:
@@ -666,6 +952,119 @@ def get_source_image_url(source_record: SourceRecord) -> str:
     return ""
 
 
+def build_missing_match_candidates(clusters: list[Cluster]) -> list[dict[str, Any]]:
+    candidates: list[dict[str, Any]] = []
+    for cluster in clusters:
+        if len(cluster.by_source) != 1:
+            continue
+        singleton = next(iter(cluster.by_source.values()))
+        best_cluster: Cluster | None = None
+        best_detail: dict[str, Any] | None = None
+        best_target: SourceRecord | None = None
+
+        for other_cluster in clusters:
+            if other_cluster is cluster:
+                continue
+            for other_record in other_cluster.by_source.values():
+                detail = pair_similarity_details(singleton, other_record)
+                score = float(detail["score"])
+                if score < MISSING_MATCH_CANDIDATE_MIN or score >= AUTO_MATCH_THRESHOLD:
+                    continue
+                if best_detail is None or score > float(best_detail["score"]):
+                    best_cluster = other_cluster
+                    best_detail = detail
+                    best_target = other_record
+
+        if best_cluster is None or best_detail is None or best_target is None:
+            continue
+
+        canonical = choose_canonical_record(best_cluster)
+        candidates.append(
+            {
+                "review_type": "possible_missing_match",
+                "source_portal": singleton.source,
+                "source_name": singleton.name,
+                "source_url": singleton.source_url,
+                "source_brand": singleton.brand,
+                "source_year": singleton.year or "",
+                "candidate_canonical_name": canonical.name,
+                "candidate_unified_id": f"racket-{best_cluster.id:05d}",
+                "candidate_source_portal": best_target.source,
+                "candidate_source_name": best_target.name,
+                "candidate_source_url": best_target.source_url,
+                "candidate_brand": best_target.brand,
+                "candidate_year": best_target.year or "",
+                "match_confidence": round(float(best_detail["score"]), 3),
+                "score_before_penalties": best_detail["score_before_penalties"],
+                "penalties_json": json.dumps(best_detail["penalties"], ensure_ascii=False),
+                "shared_tokens_json": json.dumps(best_detail["shared_tokens"], ensure_ascii=False),
+                "left_only_tokens_json": json.dumps(best_detail["left_only_tokens"], ensure_ascii=False),
+                "right_only_tokens_json": json.dumps(best_detail["right_only_tokens"], ensure_ascii=False),
+            }
+        )
+
+    candidates.sort(key=lambda row: (-float(row["match_confidence"]), row["source_name"]))
+    return candidates
+
+
+def source_name_columns(cluster: Cluster) -> dict[str, Any]:
+    row: dict[str, Any] = {}
+    for source in SOURCE_PRIORITY:
+        source_record = cluster.by_source.get(source)
+        safe_source = source.replace("-", "_")
+        row[f"{safe_source}_name"] = source_record.name if source_record else ""
+        row[f"{safe_source}_url"] = source_record.source_url if source_record else ""
+    return row
+
+
+def build_review_rows(clusters: list[Cluster]) -> list[dict[str, Any]]:
+    review_rows: list[dict[str, Any]] = []
+    for cluster in clusters:
+        reasons = cluster_review_reasons(cluster)
+        if not reasons:
+            continue
+        canonical = choose_canonical_record(cluster)
+        pair_details = cluster_pair_details(cluster)
+        row = {
+            "unified_id": f"racket-{cluster.id:05d}",
+            "canonical_name": canonical.name,
+            "brand": canonical.brand or (cluster.brands.most_common(1)[0][0] if cluster.brands else ""),
+            "year": canonical.year or (cluster.years.most_common(1)[0][0] if cluster.years else ""),
+            "source_count": len(cluster.by_source),
+            "source_portals": "|".join(sorted(cluster.by_source.keys(), key=SOURCE_PRIORITY.index)),
+            "match_confidence": cluster_match_confidence(cluster),
+            "review_reasons_json": json.dumps(reasons, ensure_ascii=False),
+            "aliases_json": json.dumps(sorted(cluster.aliases), ensure_ascii=False),
+            "pair_details_json": json.dumps(pair_details, ensure_ascii=False),
+        }
+        row.update(source_name_columns(cluster))
+        review_rows.append(row)
+    review_rows.sort(key=lambda row: (float(row["match_confidence"]), -int(row["source_count"]), row["canonical_name"]))
+    return review_rows
+
+
+def build_review_grid_rows(clusters: list[Cluster]) -> list[dict[str, Any]]:
+    grid_rows: list[dict[str, Any]] = []
+    for cluster in clusters:
+        reasons = cluster_review_reasons(cluster)
+        if not reasons:
+            continue
+        canonical = choose_canonical_record(cluster)
+        row = {
+            "unified_id": f"racket-{cluster.id:05d}",
+            "canonical_name": canonical.name,
+            "brand": canonical.brand or (cluster.brands.most_common(1)[0][0] if cluster.brands else ""),
+            "year": canonical.year or (cluster.years.most_common(1)[0][0] if cluster.years else ""),
+            "source_count": len(cluster.by_source),
+            "match_confidence": cluster_match_confidence(cluster),
+            "review_reasons": " | ".join(reasons),
+        }
+        row.update(source_name_columns(cluster))
+        grid_rows.append(row)
+    grid_rows.sort(key=lambda row: (float(row["match_confidence"]), -int(row["source_count"]), row["canonical_name"]))
+    return grid_rows
+
+
 def cluster_to_row(cluster: Cluster) -> dict[str, Any]:
     canonical = choose_canonical_record(cluster)
     sources = sorted(cluster.by_source.keys(), key=SOURCE_PRIORITY.index)
@@ -675,6 +1074,8 @@ def cluster_to_row(cluster: Cluster) -> dict[str, Any]:
         brand = infer_brand_from_text(canonical.name, canonical.slug)
     year = canonical.year or (cluster.years.most_common(1)[0][0] if cluster.years else "")
     all_source_records = list(cluster.by_source.values())
+    match_confidence = cluster_match_confidence(cluster)
+    review_reasons = cluster_review_reasons(cluster)
 
     image_source_recommended = next(
         (source for source in IMAGE_SOURCE_PRIORITY if source in sources),
@@ -699,6 +1100,9 @@ def cluster_to_row(cluster: Cluster) -> dict[str, Any]:
         "year": year,
         "source_count": source_count,
         "reliability_score": min(5, source_count),
+        "match_confidence": match_confidence,
+        "needs_review": 1 if review_reasons else 0,
+        "review_reasons_json": json.dumps(review_reasons, ensure_ascii=False),
         "source_portals": "|".join(sources),
         "source_urls_json": json.dumps(cluster.source_urls, ensure_ascii=False),
         "aliases_json": json.dumps(sorted(cluster.aliases), ensure_ascii=False),
@@ -757,10 +1161,12 @@ def write_json(records: list[dict[str, Any]], destination: Path) -> None:
 def build_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
     source_distribution = Counter(int(row["source_count"]) for row in rows)
     reliability_distribution = Counter(int(row["reliability_score"]) for row in rows)
+    needs_review_count = sum(1 for row in rows if str(row.get("needs_review", "")) == "1")
     return {
         "unified_rackets": len(rows),
         "source_count_distribution": dict(sorted(source_distribution.items())),
         "reliability_distribution": dict(sorted(reliability_distribution.items())),
+        "needs_review": needs_review_count,
     }
 
 
@@ -793,9 +1199,18 @@ def main() -> None:
     clusters = dedupe_equivalent_clusters(clusters)
     rows = [cluster_to_row(cluster) for cluster in clusters]
     rows.sort(key=lambda row: (-int(row["source_count"]), row["canonical_name"]))
+    review_rows = build_review_rows(clusters)
+    review_grid_rows = build_review_grid_rows(clusters)
+    missing_match_rows = build_missing_match_candidates(clusters)
 
     write_csv(rows, outdir / "unified-rackets.csv")
     write_json(rows, outdir / "unified-rackets.json")
+    write_csv(review_rows, outdir / "match-review.csv")
+    write_json(review_rows, outdir / "match-review.json")
+    write_csv(review_grid_rows, outdir / "match-review-grid.csv")
+    write_json(review_grid_rows, outdir / "match-review-grid.json")
+    write_csv(missing_match_rows, outdir / "possible-missing-matches.csv")
+    write_json(missing_match_rows, outdir / "possible-missing-matches.json")
     summary = build_summary(rows)
     (outdir / "unified-rackets-summary.json").write_text(
         json.dumps(summary, ensure_ascii=False, indent=2),

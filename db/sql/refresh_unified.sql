@@ -5,6 +5,9 @@ ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS image_source_portal TEXT;
 ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS core_material TEXT;
 ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS face_material TEXT;
 ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS frame_material TEXT;
+ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS match_confidence NUMERIC(5,3);
+ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS needs_review BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS review_reasons_json JSONB NOT NULL DEFAULT '[]'::jsonb;
 
 TRUNCATE TABLE app.racket_sources, app.rackets, app.brands RESTART IDENTITY CASCADE;
 
@@ -15,6 +18,9 @@ CREATE TEMP TABLE staging_unified (
     year TEXT,
     source_count TEXT,
     reliability_score TEXT,
+    match_confidence TEXT,
+    needs_review TEXT,
+    review_reasons_json TEXT,
     source_portals TEXT,
     source_urls_json TEXT,
     aliases_json TEXT,
@@ -82,6 +88,9 @@ INSERT INTO app.rackets (
     slug_canonical,
     source_count,
     reliability_score,
+    match_confidence,
+    needs_review,
+    review_reasons_json,
     source_portals,
     source_urls_json,
     aliases_json,
@@ -121,6 +130,9 @@ SELECT
     NULLIF(s.slug_canonical, ''),
     NULLIF(s.source_count, '')::SMALLINT,
     NULLIF(s.reliability_score, '')::SMALLINT,
+    NULLIF(s.match_confidence, '')::NUMERIC(5,3),
+    COALESCE(NULLIF(s.needs_review, ''), '0') = '1',
+    COALESCE(NULLIF(s.review_reasons_json, '')::JSONB, '[]'::JSONB),
     CASE
         WHEN NULLIF(s.source_portals, '') IS NULL THEN ARRAY[]::TEXT[]
         ELSE string_to_array(s.source_portals, '|')
@@ -166,6 +178,9 @@ INSERT INTO app.rackets (
     slug_canonical,
     source_count,
     reliability_score,
+    match_confidence,
+    needs_review,
+    review_reasons_json,
     source_portals,
     source_urls_json,
     aliases_json,
@@ -205,6 +220,9 @@ SELECT
     NULLIF(s.slug_canonical, ''),
     NULLIF(s.source_count, '')::SMALLINT,
     NULLIF(s.reliability_score, '')::SMALLINT,
+    NULLIF(s.match_confidence, '')::NUMERIC(5,3),
+    COALESCE(NULLIF(s.needs_review, ''), '0') = '1',
+    COALESCE(NULLIF(s.review_reasons_json, '')::JSONB, '[]'::JSONB),
     CASE
         WHEN NULLIF(s.source_portals, '') IS NULL THEN ARRAY[]::TEXT[]
         ELSE string_to_array(s.source_portals, '|')

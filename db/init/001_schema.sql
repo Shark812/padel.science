@@ -17,6 +17,9 @@ CREATE TABLE IF NOT EXISTS app.rackets (
     slug_canonical TEXT,
     source_count SMALLINT NOT NULL,
     reliability_score SMALLINT NOT NULL CHECK (reliability_score BETWEEN 1 AND 5),
+    match_confidence NUMERIC(5,3),
+    needs_review BOOLEAN NOT NULL DEFAULT FALSE,
+    review_reasons_json JSONB NOT NULL DEFAULT '[]'::jsonb,
     source_portals TEXT[] NOT NULL DEFAULT '{}',
     source_urls_json JSONB NOT NULL DEFAULT '{}'::jsonb,
     aliases_json JSONB NOT NULL DEFAULT '[]'::jsonb,
@@ -59,6 +62,9 @@ ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS weight_raw TEXT;
 ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS core_material TEXT;
 ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS face_material TEXT;
 ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS frame_material TEXT;
+ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS match_confidence NUMERIC(5,3);
+ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS needs_review BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS review_reasons_json JSONB NOT NULL DEFAULT '[]'::jsonb;
 ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS image_source_recommended TEXT;
 ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS image_url TEXT;
 ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS image_source_portal TEXT;
@@ -108,6 +114,13 @@ ON app.rackets(reliability_score);
 
 CREATE INDEX IF NOT EXISTS idx_rackets_source_count
 ON app.rackets(source_count);
+
+CREATE INDEX IF NOT EXISTS idx_rackets_match_confidence
+ON app.rackets(match_confidence);
+
+CREATE INDEX IF NOT EXISTS idx_rackets_needs_review
+ON app.rackets(needs_review)
+WHERE needs_review = TRUE;
 
 CREATE INDEX IF NOT EXISTS idx_rackets_slug_canonical
 ON app.rackets(slug_canonical);
@@ -164,6 +177,9 @@ SELECT
     r.slug_canonical,
     r.source_count,
     r.reliability_score,
+    r.match_confidence,
+    r.needs_review,
+    r.review_reasons_json,
     r.source_portals,
     r.source_urls_json,
     r.aliases_json,
@@ -214,6 +230,9 @@ RETURNS TABLE (
     year INTEGER,
     source_count SMALLINT,
     reliability_score SMALLINT,
+    match_confidence NUMERIC(5,3),
+    needs_review BOOLEAN,
+    review_reasons_json JSONB,
     image_url TEXT,
     overall_rating_avg NUMERIC(6,3),
     similarity_score REAL
@@ -229,6 +248,9 @@ AS $$
         re.year,
         re.source_count,
         re.reliability_score,
+        re.match_confidence,
+        re.needs_review,
+        re.review_reasons_json,
         re.image_url,
         re.overall_rating_avg,
         CASE
@@ -267,6 +289,9 @@ RETURNS TABLE (
     year INTEGER,
     source_count SMALLINT,
     reliability_score SMALLINT,
+    match_confidence NUMERIC(5,3),
+    needs_review BOOLEAN,
+    review_reasons_json JSONB,
     image_url TEXT,
     image_source_portal TEXT,
     shape TEXT,
@@ -305,6 +330,9 @@ AS $$
         re.year,
         re.source_count,
         re.reliability_score,
+        re.match_confidence,
+        re.needs_review,
+        re.review_reasons_json,
         re.image_url,
         re.image_source_portal,
         re.shape,
@@ -361,6 +389,8 @@ RETURNS TABLE (
     year INTEGER,
     source_count SMALLINT,
     reliability_score SMALLINT,
+    match_confidence NUMERIC(5,3),
+    needs_review BOOLEAN,
     image_url TEXT,
     overall_rating_avg NUMERIC(6,3),
     power_avg NUMERIC(6,3),
@@ -388,6 +418,8 @@ AS $$
         re.year,
         re.source_count,
         re.reliability_score,
+        re.match_confidence,
+        re.needs_review,
         re.image_url,
         re.overall_rating_avg,
         re.power_avg,
