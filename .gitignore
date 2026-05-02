@@ -23,6 +23,16 @@ desktop.ini
 .idea/
 .vscode/
 
+# Node / Next.js
+node_modules/
+.next/
+out/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
 # Local environment / secrets
 .env
 .env.*
@@ -51,4 +61,3 @@ data/source-state/
 # Optional local samples / scratch outputs
 data/*-sample/
 data/*-sample-*/
-
