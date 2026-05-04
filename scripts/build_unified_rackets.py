@@ -209,12 +209,10 @@ SOURCE_PRIORITY = [
     "pala-hack",
     "padelzoom",
     "padelreference",
-    "racketguide",
     "extreme-tennis",
 ]
 IMAGE_SOURCE_PRIORITY = [
     "padelful",
-    "racketguide",
     "padelreference",
     "pala-hack",
     "padelzoom",
@@ -229,7 +227,6 @@ SOURCE_FILES = {
     "padelful": Path("data/padelful-en-full/padelful.csv"),
     "pala-hack": Path("data/pala-hack-en-full/pala-hack.csv"),
     "padelzoom": Path("data/padelzoom-es-full/padelzoom.csv"),
-    "racketguide": Path("data/racketguide-it-en-full/racketguide.csv"),
 }
 MANUAL_EQUIVALENCES_PATH = Path("data/manual-equivalences.json")
 
