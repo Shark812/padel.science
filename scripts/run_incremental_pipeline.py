@@ -69,7 +69,11 @@ def append_new_records(
     state_path = STATE_DIR / f"{base_name}-seen-urls.json"
     records = load_json_records(json_path)
     known_urls = {record.get("source_url") for record in records if record.get("source_url")}
-    seen_urls = load_seen_urls(state_path) or set(known_urls)
+    seen_urls = load_seen_urls(state_path)
+    if seen_urls:
+        seen_urls |= known_urls
+    else:
+        seen_urls = set(known_urls)
     current_urls = list(dict.fromkeys(load_urls()))
     new_urls = [url for url in current_urls if url not in seen_urls]
     added_records = 0

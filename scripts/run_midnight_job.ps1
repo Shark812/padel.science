@@ -61,7 +61,13 @@ try {
     Ensure-Docker
 
     Write-Log "Running incremental crawl + unify pipeline."
-    python (Join-Path $root "scripts\run_incremental_pipeline.py") 2>&1 | Tee-Object -FilePath $logPath -Append
+    $incrementalScript = Join-Path $root "scripts\run_incremental_pipeline.py"
+    $incrementalOutput = cmd /c "python ""$incrementalScript"" 2>&1"
+    $incrementalExitCode = $LASTEXITCODE
+    $incrementalOutput | Tee-Object -FilePath $logPath -Append
+    if ($incrementalExitCode -ne 0) {
+        throw "Incremental pipeline failed with exit code $incrementalExitCode. See $logPath for full output."
+    }
 
     if (-not (Test-Path $incrementalReport)) {
         throw "Incremental report not found after pipeline run: $incrementalReport"
@@ -157,6 +163,6 @@ print(json.dumps(report, ensure_ascii=False, indent=2))
     Write-Log "Midnight job completed successfully."
 }
 catch {
-    Write-Log ("Midnight job failed: " + $_.Exception.Message)
+    Write-Log ("Midnight job failed: " + ($_ | Out-String))
     throw
 }
