@@ -35,6 +35,10 @@ export type RacketSearchResult = {
   control_avg: string | null;
   maneuverability_avg: string | null;
   sweet_spot_avg: string | null;
+  shape: string | null;
+  surface: string | null;
+  balance: string | null;
+  level: string | null;
   similarity_score: number;
 };
 
@@ -90,6 +94,10 @@ export async function searchRackets(query: string | null) {
         re.control_avg,
         re.maneuverability_avg,
         re.sweet_spot_avg,
+        re.shape,
+        re.surface,
+        re.balance,
+        re.level,
         1::real AS similarity_score
       FROM app.rackets_enriched re
       WHERE (

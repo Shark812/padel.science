@@ -93,7 +93,7 @@ try {
         exit 0
     }
 
-    Write-Log "Refreshing local PostgreSQL."
+    Write-Log "Refreshing local PostgreSQL (includes missing-year enrichment step)."
     & (Join-Path $root "scripts\refresh_local_postgres.ps1") 2>&1 | Tee-Object -FilePath $logPath -Append
 
     if (-not (Test-Path $currentUnified)) {

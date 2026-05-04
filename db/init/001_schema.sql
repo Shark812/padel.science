@@ -8,6 +8,20 @@ CREATE TABLE IF NOT EXISTS app.brands (
     name TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS app.brand_official_domains (
+    id BIGSERIAL PRIMARY KEY,
+    brand_id BIGINT NOT NULL UNIQUE REFERENCES app.brands(id) ON DELETE CASCADE,
+    official_domain TEXT,
+    official_url TEXT,
+    domain_source TEXT NOT NULL DEFAULT 'manual_research',
+    confidence_score SMALLINT NOT NULL DEFAULT 1 CHECK (confidence_score BETWEEN 1 AND 5),
+    resolution_status TEXT NOT NULL DEFAULT 'resolved'
+        CHECK (resolution_status IN ('resolved', 'needs_review', 'unresolved')),
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS app.rackets (
     id BIGSERIAL PRIMARY KEY,
     unified_id TEXT NOT NULL UNIQUE,
@@ -96,9 +110,21 @@ BEFORE UPDATE ON app.rackets
 FOR EACH ROW
 EXECUTE FUNCTION app.set_updated_at();
 
+DROP TRIGGER IF EXISTS set_brand_official_domains_updated_at ON app.brand_official_domains;
+CREATE TRIGGER set_brand_official_domains_updated_at
+BEFORE UPDATE ON app.brand_official_domains
+FOR EACH ROW
+EXECUTE FUNCTION app.set_updated_at();
+
 CREATE INDEX IF NOT EXISTS idx_brands_name_trgm
 ON app.brands
 USING gin (name gin_trgm_ops);
+
+CREATE INDEX IF NOT EXISTS idx_brand_official_domains_domain
+ON app.brand_official_domains(official_domain);
+
+CREATE INDEX IF NOT EXISTS idx_brand_official_domains_status
+ON app.brand_official_domains(resolution_status);
 
 CREATE INDEX IF NOT EXISTS idx_rackets_brand_id
 ON app.rackets(brand_id);

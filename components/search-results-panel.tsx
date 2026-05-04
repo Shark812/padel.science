@@ -28,14 +28,45 @@ type SearchResultsPanelProps = {
   initialSortValue: string;
 };
 
-type FilterKey = "power" | "control" | "maneuverability" | "sweet_spot";
+type FilterKey =
+  | "overall"
+  | "power"
+  | "control"
+  | "maneuverability"
+  | "sweet_spot"
+  | "reliability";
+type CategoricalFilterKey = "shape";
 
-const filterDefs: { key: FilterKey; label: string; field: SortOption["field"] }[] = [
-  { key: "power", label: "Power", field: "power_avg" },
-  { key: "control", label: "Control", field: "control_avg" },
-  { key: "maneuverability", label: "Maneuverability", field: "maneuverability_avg" },
-  { key: "sweet_spot", label: "Sweet spot", field: "sweet_spot_avg" },
+const filterDefs: {
+  key: FilterKey;
+  label: string;
+  field?: SortOption["field"];
+  min: number;
+  max: number;
+  step: number;
+}[] = [
+  { key: "overall", label: "Overall", field: "overall_rating_avg", min: 3, max: 9.5, step: 0.5 },
+  { key: "power", label: "Power", field: "power_avg", min: 3, max: 9.5, step: 0.5 },
+  { key: "control", label: "Control", field: "control_avg", min: 3, max: 9.5, step: 0.5 },
+  {
+    key: "maneuverability",
+    label: "Maneuverability",
+    field: "maneuverability_avg",
+    min: 3,
+    max: 9.5,
+    step: 0.5,
+  },
+  { key: "sweet_spot", label: "Sweet spot", field: "sweet_spot_avg", min: 3, max: 9.5, step: 0.5 },
+  { key: "reliability", label: "Reliability", min: 1, max: 5, step: 1 },
 ];
+
+const RELIABILITY_COLORS = [
+  "bg-red-500",
+  "bg-orange-500",
+  "bg-yellow-400",
+  "bg-lime-500",
+  "bg-emerald-700",
+] as const;
 
 function parseMetric(value: string | null) {
   if (!value) {
@@ -63,11 +94,24 @@ export function SearchResultsPanel({
   const [sortValue, setSortValue] = useState(initialSortValue);
   const [viewMode, setViewMode] = useState<"list" | "cards">("list");
   const [mins, setMins] = useState<Record<FilterKey, number>>({
+    overall: 3,
     power: 3,
     control: 3,
     maneuverability: 3,
     sweet_spot: 3,
+    reliability: 3,
   });
+  const [categoricalFilters, setCategoricalFilters] = useState<Record<CategoricalFilterKey, string>>({
+    shape: "all",
+  });
+
+  const shapeOptions = useMemo(() => {
+    const values = new Set<string>();
+    for (const racket of rackets) {
+      if (racket.shape) values.add(racket.shape);
+    }
+    return ["all", ...Array.from(values).sort((a, b) => a.localeCompare(b))];
+  }, [rackets]);
 
   const activeSort = useMemo(
     () => sortOptions.find((option) => option.value === sortValue) ?? sortOptions[0],
@@ -77,9 +121,18 @@ export function SearchResultsPanel({
   const filteredAndSorted = useMemo(() => {
     const filtered = rackets.filter((racket) =>
       filterDefs.every((def) => {
+        if (def.key === "reliability") {
+          return racket.reliability_score >= mins.reliability;
+        }
+
+        if (!def.field) {
+          return true;
+        }
+
         const score = parseMetric(racket[def.field]);
         return score !== null && score >= mins[def.key];
-      }),
+      }) &&
+      (categoricalFilters.shape === "all" || racket.shape === categoricalFilters.shape),
     );
 
     return filtered.sort((a, b) => {
@@ -97,7 +150,7 @@ export function SearchResultsPanel({
 
       return a.canonical_name.localeCompare(b.canonical_name);
     });
-  }, [activeSort.field, mins, rackets]);
+  }, [activeSort.field, categoricalFilters, mins, rackets]);
 
   return (
     <div className="mx-auto mt-12 grid w-full max-w-6xl gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
@@ -105,15 +158,28 @@ export function SearchResultsPanel({
         <h2 className="text-base font-semibold tracking-tight text-foreground">Filters</h2>
         <div className="mt-5 grid gap-5">
           {filterDefs.map((def) => (
-            <div key={def.key} className="grid gap-2">
+            <div
+              key={def.key}
+              className={`grid gap-2 ${
+                def.key === "overall" ? "pb-2" : ""
+              } ${
+                def.key === "reliability" ? "border-t border-border pt-4" : ""
+              }`}
+            >
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-muted-foreground">{def.label}</label>
+                <label
+                  className={`text-sm ${
+                    def.key === "overall" ? "font-semibold text-foreground" : "font-medium text-muted-foreground"
+                  }`}
+                >
+                  {def.label}
+                </label>
                 <span className="font-mono text-sm text-foreground">{mins[def.key].toFixed(1)}</span>
               </div>
               <Slider
-                min={3}
-                max={9.5}
-                step={0.5}
+                min={def.min}
+                max={def.max}
+                step={def.step}
                 value={[mins[def.key]]}
                 onValueChange={(value) =>
                   setMins((prev) => ({
@@ -124,6 +190,31 @@ export function SearchResultsPanel({
               />
             </div>
           ))}
+        </div>
+        <div className="mt-4 grid gap-3 border-t border-border pt-4">
+          <div className="grid gap-1.5">
+            <label className="text-sm font-medium text-muted-foreground">Shape</label>
+            <Select
+              value={categoricalFilters.shape}
+              onValueChange={(value) =>
+                setCategoricalFilters((prev) => ({
+                  ...prev,
+                  shape: value,
+                }))
+              }
+            >
+              <SelectTrigger className="w-full rounded-md border-border bg-card">
+                <SelectValue placeholder="All shapes" />
+              </SelectTrigger>
+              <SelectContent>
+                {shapeOptions.map((value) => (
+                  <SelectItem key={`shape-${value}`} value={value}>
+                    {value === "all" ? "All shapes" : value}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </aside>
 
@@ -202,9 +293,22 @@ export function SearchResultsPanel({
                     <h3 className="mt-2 text-lg font-semibold tracking-tight text-foreground group-hover:text-primary">
                       {racket.canonical_name}
                     </h3>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {racket.source_count} sources - reliability {racket.reliability_score}/5
-                    </p>
+                    <div className="mt-2 max-w-[220px]">
+                      <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                        Reliability
+                      </p>
+                      <div className="mt-1 grid grid-cols-5 gap-1">
+                        {RELIABILITY_COLORS.map((colorClass, index) => {
+                          const isActive = index < racket.reliability_score;
+                          return (
+                            <div
+                              key={`${racket.unified_id}-list-rel-${colorClass}`}
+                              className={`h-2 rounded-sm ${isActive ? colorClass : "bg-muted"}`}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                   <div className="flex items-center md:justify-end">
                     <div className="rounded-lg border border-border px-4 py-3 text-right">
@@ -243,9 +347,22 @@ export function SearchResultsPanel({
                   <h3 className="mt-2 line-clamp-2 text-base font-semibold tracking-tight text-foreground group-hover:text-primary">
                     {racket.canonical_name}
                   </h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {racket.source_count} sources - reliability {racket.reliability_score}/5
-                  </p>
+                  <div className="mt-2">
+                    <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                      Reliability
+                    </p>
+                    <div className="mt-1 grid grid-cols-5 gap-1">
+                      {RELIABILITY_COLORS.map((colorClass, index) => {
+                        const isActive = index < racket.reliability_score;
+                        return (
+                          <div
+                            key={`${racket.unified_id}-card-rel-${colorClass}`}
+                            className={`h-2 rounded-sm ${isActive ? colorClass : "bg-muted"}`}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
                   <div className="mt-3 rounded-lg border border-border px-3 py-2 text-right">
                     <p className="font-mono text-xl font-semibold text-foreground">
                       {formatScore(racket.overall_rating_avg)}

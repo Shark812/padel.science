@@ -28,6 +28,13 @@ const details = [
 
 const RADAR_MIN = 3.5;
 const RADAR_MAX = 10;
+const RELIABILITY_COLORS = [
+  "bg-red-500",
+  "bg-orange-500",
+  "bg-yellow-400",
+  "bg-lime-500",
+  "bg-emerald-700",
+] as const;
 
 function toProgress(value: number | null, min = RADAR_MIN, max = RADAR_MAX) {
   if (value === null) {
@@ -88,9 +95,6 @@ export default async function RacketPage({ params }: RacketPageProps) {
                     {racket.year ? (
                       <Badge variant="outline">{racket.year}</Badge>
                     ) : null}
-                    <Badge variant="secondary">
-                      {racket.source_count} sources
-                    </Badge>
                   </div>
                   <h1 className="mt-5 text-4xl font-semibold tracking-tight text-foreground md:text-5xl">
                     {racket.canonical_name}
@@ -107,11 +111,22 @@ export default async function RacketPage({ params }: RacketPageProps) {
                     </p>
                   </div>
                   <div className="rounded-xl border border-border p-4">
-                    <p className="font-mono text-4xl font-semibold tracking-tight text-foreground">
-                      {racket.reliability_score}/5
-                    </p>
                     <p className="mt-1 text-xs uppercase tracking-[0.16em] text-muted-foreground">
                       Reliability
+                    </p>
+                    <div className="mt-3 grid grid-cols-5 gap-1.5">
+                      {RELIABILITY_COLORS.map((colorClass, index) => {
+                        const isActive = index < racket.reliability_score;
+                        return (
+                          <div
+                            key={colorClass}
+                            className={`h-2.5 rounded-sm ${isActive ? colorClass : "bg-muted"}`}
+                          />
+                        );
+                      })}
+                    </div>
+                    <p className="mt-2 text-right font-mono text-sm text-foreground">
+                      {racket.reliability_score}/5
                     </p>
                   </div>
                 </div>

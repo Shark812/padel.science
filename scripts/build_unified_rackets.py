@@ -209,10 +209,12 @@ SOURCE_PRIORITY = [
     "pala-hack",
     "padelzoom",
     "padelreference",
+    "racketguide",
     "extreme-tennis",
 ]
 IMAGE_SOURCE_PRIORITY = [
     "padelful",
+    "racketguide",
     "padelreference",
     "pala-hack",
     "padelzoom",
@@ -227,6 +229,7 @@ SOURCE_FILES = {
     "padelful": Path("data/padelful-en-full/padelful.csv"),
     "pala-hack": Path("data/pala-hack-en-full/pala-hack.csv"),
     "padelzoom": Path("data/padelzoom-es-full/padelzoom.csv"),
+    "racketguide": Path("data/racketguide-it-en-full/racketguide.csv"),
 }
 MANUAL_EQUIVALENCES_PATH = Path("data/manual-equivalences.json")
 
@@ -716,6 +719,8 @@ def cluster_threshold(record: SourceRecord) -> float:
 
 def load_source_records(source: str, path: Path) -> list[SourceRecord]:
     records: list[SourceRecord] = []
+    if not path.exists():
+        return records
     with path.open(encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
         for row in reader:

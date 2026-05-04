@@ -26,4 +26,16 @@ if ($LASTEXITCODE -ne 0) {
     throw "Failed to refresh PostgreSQL from unified dataset."
 }
 
+Write-Output "Seeding official brand domains."
+node (Join-Path $root "scripts\seed_brand_official_domains.js")
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to seed official brand domains."
+}
+
+Write-Output "Enriching missing racket years from source pages and official domains."
+node (Join-Path $root "scripts\enrich_missing_years.js") --limit 500 --sleep-ms 40 --min-confidence 70 --apply
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to enrich missing racket years."
+}
+
 Write-Output "Local PostgreSQL refreshed from unified-rackets.csv"
