@@ -42,7 +42,7 @@ function normalized(value: number | null) {
 }
 
 function metricText(value: number | null) {
-  return value === null ? "n.d." : value.toFixed(0);
+  return value === null ? "N/A" : value.toFixed(0);
 }
 
 export default async function RacketPage({ params }: RacketPageProps) {
@@ -91,13 +91,13 @@ export default async function RacketPage({ params }: RacketPageProps) {
               )}
             </div>
             <div className="mt-5 grid grid-cols-[auto_1fr_1fr_1fr_auto] items-center gap-3">
-              <button type="button" className="text-2xl text-muted-foreground" aria-label="Previous image">‹</button>
+              <button type="button" className="text-2xl text-muted-foreground" aria-label="Previous image">&lt;</button>
               {[racket.image_url, racket.image_url, racket.image_url].map((image, index) => (
                 <div key={`thumb-${index}`} className={`flex h-20 items-center justify-center rounded-xl border bg-card p-2 ${index === 0 ? "border-primary" : "border-border"}`}>
                   {image ? <img src={image} alt={`${racket.canonical_name} thumbnail ${index + 1}`} className="max-h-16 object-contain" /> : null}
                 </div>
               ))}
-              <button type="button" className="text-2xl text-muted-foreground" aria-label="Next image">›</button>
+              <button type="button" className="text-2xl text-muted-foreground" aria-label="Next image">&gt;</button>
             </div>
           </div>
 
@@ -123,7 +123,7 @@ export default async function RacketPage({ params }: RacketPageProps) {
             <div className="mt-7 grid gap-5 md:grid-cols-[220px_1fr] md:items-center">
               <div>
                 <div className="flex items-end gap-2">
-                  <span className="font-mono text-7xl font-bold leading-none text-primary">{overall === null ? "n.d." : overall.toFixed(0)}</span>
+                  <span className="font-mono text-7xl font-bold leading-none text-primary">{overall === null ? "N/A" : overall.toFixed(0)}</span>
                   <span className="pb-3 text-2xl text-muted-foreground">/100</span>
                 </div>
                 <p className="mt-1 text-lg text-foreground">Overall score</p>
@@ -270,7 +270,7 @@ export default async function RacketPage({ params }: RacketPageProps) {
                 </div>
                 <div>
                   <p className="font-bold">{item.canonical_name}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{item.shape ?? "Shape n.d."} · {item.level ?? "Level n.d."}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{item.shape ?? "Shape N/A"} - {item.level ?? "Level N/A"}</p>
                   <p className="mt-3 font-mono text-2xl font-bold text-primary">{formatScore(item.overall_rating_avg)}<span className="text-sm text-muted-foreground">/100</span></p>
                 </div>
               </Link>
@@ -288,3 +288,5 @@ export default async function RacketPage({ params }: RacketPageProps) {
     </main>
   );
 }
+
+

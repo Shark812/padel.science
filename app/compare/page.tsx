@@ -22,7 +22,7 @@ const specRows = [
 
 function metric(value: string | number | null | undefined) {
   const parsed = toScore(value);
-  return parsed === null ? "n.d." : parsed.toFixed(0);
+  return parsed === null ? "N/A" : parsed.toFixed(0);
 }
 
 function percent(value: string | number | null | undefined) {
@@ -32,7 +32,7 @@ function percent(value: string | number | null | undefined) {
 
 function specValue(racket: RacketDetail, key: (typeof specRows)[number][1]) {
   if (key === "sweet_spot_avg") return metric(racket.sweet_spot_avg);
-  return racket[key] ?? "n.d.";
+  return racket[key] ?? "N/A";
 }
 
 export default async function ComparePage({ searchParams }: ComparePageProps) {

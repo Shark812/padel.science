@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, LayoutGrid, List, Plus, Scale, SlidersHorizontal, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +12,9 @@ import type { RacketSearchResult } from "@/lib/db";
 import { cn } from "@/lib/utils";
 
 const MAX_COMPARE = 2;
-const INITIAL_VISIBLE_RESULTS = 48;
+const INITIAL_VISIBLE_RESULTS = 9;
+const LOAD_MORE_BATCH_SIZE = 9;
+const COMPARE_STORAGE_KEY = "padel-compare-selection-v1";
 
 type SortOption = {
   value: string;
@@ -33,6 +35,12 @@ type SearchResultsPanelProps = {
 };
 
 type FilterKey = "overall" | "power" | "control" | "maneuverability" | "sweet_spot" | "reliability";
+type CompareSelection = {
+  id: string;
+  canonical_name: string;
+  brand_name: string;
+  image_url: string | null;
+};
 
 const filterDefs: {
   key: FilterKey;
@@ -64,7 +72,17 @@ function score(value: string | number | null | undefined) {
 
 function scoreText(value: string | number | null | undefined) {
   const parsed = score(value);
-  return parsed === null ? "n.d." : parsed.toFixed(0);
+  return parsed === null ? "N/A" : parsed.toFixed(0);
+}
+
+function overallScoreText(value: string | number | null | undefined) {
+  const parsed = score(value);
+  return parsed === null ? "N/A" : parsed.toFixed(1);
+}
+
+function reliabilityText(value: number | null | undefined) {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "N/A";
+  return Math.round(value).toString();
 }
 
 function metricWidth(value: string | number | null | undefined) {
@@ -81,7 +99,7 @@ export function SearchResultsPanel({
   const [sortValue, setSortValue] = useState(initialSortValue);
   const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_RESULTS);
-  const [selectedIds, setSelectedIds] = useState<string[]>(() => rackets.slice(0, MAX_COMPARE).map((racket) => racket.unified_id));
+  const [selectedCompare, setSelectedCompare] = useState<CompareSelection[]>([]);
   const [shape, setShape] = useState("all");
   const [mins, setMins] = useState<Record<FilterKey, number>>({
     overall: 0,
@@ -89,8 +107,59 @@ export function SearchResultsPanel({
     control: 0,
     maneuverability: 0,
     sweet_spot: 0,
-    reliability: 1,
+    reliability: 3,
   });
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+
+  const selectedIds = useMemo(
+    () => selectedCompare.map((item) => item.id),
+    [selectedCompare],
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const raw = window.sessionStorage.getItem(COMPARE_STORAGE_KEY);
+    if (!raw) return;
+
+    try {
+      const parsed = JSON.parse(raw) as CompareSelection[];
+      if (!Array.isArray(parsed)) return;
+
+      const normalized = parsed
+        .filter((item) => item && typeof item.id === "string")
+        .slice(0, MAX_COMPARE)
+        .map((item) => ({
+          id: item.id,
+          canonical_name: item.canonical_name ?? "Unknown racket",
+          brand_name: item.brand_name ?? "Unknown brand",
+          image_url: item.image_url ?? null,
+        }));
+
+      setSelectedCompare(normalized);
+    } catch {
+      window.sessionStorage.removeItem(COMPARE_STORAGE_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    setSelectedCompare((current) =>
+      current.map((item) => {
+        const racket = rackets.find((candidate) => candidate.unified_id === item.id);
+        if (!racket) return item;
+        return {
+          id: racket.unified_id,
+          canonical_name: racket.canonical_name,
+          brand_name: racket.brand_name,
+          image_url: racket.image_url,
+        };
+      }),
+    );
+  }, [rackets]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.sessionStorage.setItem(COMPARE_STORAGE_KEY, JSON.stringify(selectedCompare));
+  }, [selectedCompare]);
 
   const activeSort = useMemo(
     () => sortOptions.find((option) => option.value === sortValue) ?? sortOptions[0],
@@ -125,16 +194,46 @@ export function SearchResultsPanel({
       });
   }, [activeSort.field, mins, rackets, shape]);
 
-  const selectedRackets = selectedIds
-    .map((id) => rackets.find((racket) => racket.unified_id === id))
-    .filter(Boolean) as RacketSearchResult[];
   const visibleRackets = filteredAndSorted.slice(0, visibleCount);
+  const hasMoreResults = filteredAndSorted.length > visibleCount;
 
-  function toggleCompare(id: string) {
-    setSelectedIds((current) => {
-      if (current.includes(id)) return current.filter((selectedId) => selectedId !== id);
+  useEffect(() => {
+    setVisibleCount(INITIAL_VISIBLE_RESULTS);
+  }, [query, sortValue, shape, mins]);
+
+  useEffect(() => {
+    if (!hasMoreResults || !loadMoreRef.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry?.isIntersecting) return;
+        setVisibleCount((current) =>
+          Math.min(current + LOAD_MORE_BATCH_SIZE, filteredAndSorted.length),
+        );
+      },
+      { rootMargin: "220px 0px" },
+    );
+
+    observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [hasMoreResults, filteredAndSorted.length]);
+
+  function toggleCompare(racket: RacketSearchResult) {
+    setSelectedCompare((current) => {
+      if (current.some((item) => item.id === racket.unified_id)) {
+        return current.filter((item) => item.id !== racket.unified_id);
+      }
       if (current.length >= MAX_COMPARE) return current;
-      return [...current, id];
+      return [
+        ...current,
+        {
+          id: racket.unified_id,
+          canonical_name: racket.canonical_name,
+          brand_name: racket.brand_name,
+          image_url: racket.image_url,
+        },
+      ];
     });
   }
 
@@ -146,11 +245,11 @@ export function SearchResultsPanel({
       control: 0,
       maneuverability: 0,
       sweet_spot: 0,
-      reliability: 1,
+      reliability: 3,
     });
   }
 
-  const compareHref = `/compare?ids=${selectedIds.join(",")}`;
+  const compareHref = selectedIds.length > 0 ? `/compare?ids=${selectedIds.join(",")}` : "/compare";
 
   return (
     <section className="ps-container pb-36 pt-7">
@@ -263,7 +362,7 @@ export function SearchResultsPanel({
                   >
                     <button
                       type="button"
-                      onClick={() => toggleCompare(racket.unified_id)}
+                      onClick={() => toggleCompare(racket)}
                       className={cn(
                         "absolute left-4 top-4 z-10 flex size-6 items-center justify-center rounded-full border bg-card transition",
                         isSelected ? "border-primary bg-primary text-primary-foreground" : "border-border text-transparent hover:text-primary",
@@ -297,10 +396,10 @@ export function SearchResultsPanel({
                       <div className="mt-3 flex items-end justify-between gap-2">
                         <div>
                           <Badge className="rounded-md bg-secondary text-primary">Reliability</Badge>
-                          <p className="mt-1 font-mono text-sm font-bold text-primary">{racket.reliability_score}.0/5</p>
+                          <p className="mt-1 font-mono text-sm font-bold text-primary">{reliabilityText(racket.reliability_score)}/5</p>
                         </div>
                         <div className="text-right">
-                          <p className="font-mono text-4xl font-bold leading-none text-primary">{scoreText(racket.overall_rating_avg)}</p>
+                          <p className="font-mono text-4xl font-bold leading-none text-primary">{overallScoreText(racket.overall_rating_avg)}</p>
                           <p className="text-[10px] font-semibold text-muted-foreground">Overall score</p>
                         </div>
                       </div>
@@ -327,7 +426,7 @@ export function SearchResultsPanel({
                         <Button
                           type="button"
                           className="h-9 gap-1 rounded-lg bg-accent text-xs font-bold text-accent-foreground hover:bg-accent/85"
-                          onClick={() => toggleCompare(racket.unified_id)}
+                          onClick={() => toggleCompare(racket)}
                           disabled={!isSelected && selectedIds.length >= MAX_COMPARE}
                         >
                           <Scale className="size-4" />
@@ -346,18 +445,7 @@ export function SearchResultsPanel({
             </div>
           )}
 
-          {filteredAndSorted.length > visibleCount ? (
-            <div className="mt-5 flex justify-center">
-              <Button
-                type="button"
-                variant="outline"
-                className="h-11 rounded-xl px-6"
-                onClick={() => setVisibleCount((current) => current + INITIAL_VISIBLE_RESULTS)}
-              >
-                Show more rackets
-              </Button>
-            </div>
-          ) : null}
+          <div ref={loadMoreRef} className="mt-6 h-8" />
 
           <div className="surface-card mt-5 rounded-xl p-4">
             <div className="mb-3 flex items-center justify-between">
@@ -375,10 +463,10 @@ export function SearchResultsPanel({
                   </div>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-bold">{racket.canonical_name}</p>
-                    <p className="text-xs text-muted-foreground">{racket.year ?? "Recent"} · {racket.shape ?? "Shape n.d."}</p>
-                    <p className="mt-1 text-xs font-bold text-primary">Reliability {racket.reliability_score}.0/5</p>
+                    <p className="text-xs text-muted-foreground">{racket.year ?? "Recent"} - {racket.shape ?? "Shape N/A"}</p>
+                    <p className="mt-1 text-xs font-bold text-primary">Reliability {reliabilityText(racket.reliability_score)}/5</p>
                   </div>
-                  <span className="font-mono text-lg font-bold text-primary">{scoreText(racket.overall_rating_avg)}</span>
+                  <span className="font-mono text-lg font-bold text-primary">{overallScoreText(racket.overall_rating_avg)}</span>
                 </Link>
               ))}
             </div>
@@ -394,9 +482,9 @@ export function SearchResultsPanel({
           </div>
           <div className="grid gap-2 md:grid-cols-2">
             {Array.from({ length: MAX_COMPARE }).map((_, index) => {
-              const racket = selectedRackets[index];
+              const racket = selectedCompare[index];
               return racket ? (
-                <div key={racket.unified_id} className="grid grid-cols-[48px_1fr_auto] items-center gap-2 rounded-xl border border-border bg-background p-2">
+                <div key={racket.id} className="grid grid-cols-[48px_1fr_auto] items-center gap-2 rounded-xl border border-border bg-background p-2">
                   <div className="flex size-12 items-center justify-center rounded-lg bg-muted">
                     {racket.image_url ? <img src={racket.image_url} alt={racket.canonical_name} className="max-h-10 max-w-10 object-contain" /> : null}
                   </div>
@@ -404,7 +492,12 @@ export function SearchResultsPanel({
                     <p className="truncate text-xs font-bold">{racket.brand_name}</p>
                     <p className="truncate text-xs text-muted-foreground">{racket.canonical_name}</p>
                   </div>
-                  <button type="button" className="size-7 rounded-full hover:bg-muted" onClick={() => toggleCompare(racket.unified_id)} aria-label="Remove from comparison">
+                  <button
+                    type="button"
+                    className="size-7 rounded-full hover:bg-muted"
+                    onClick={() => setSelectedCompare((current) => current.filter((item) => item.id !== racket.id))}
+                    aria-label="Remove from comparison"
+                  >
                     <X className="mx-auto size-4" />
                   </button>
                 </div>

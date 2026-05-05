@@ -2,15 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Heart, Search, UserRound } from "lucide-react";
 
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/", label: "Home", match: "exact" },
-  { href: "/", label: "Rackets", match: "rackets" },
-  { href: "/compare", label: "Compare" },
   { href: "/methodology", label: "Methodology" },
 ];
 
@@ -42,9 +39,7 @@ export function SiteHeader() {
             const isActive =
               item.match === "exact"
                 ? pathname === "/"
-                : item.match === "rackets"
-                  ? pathname.startsWith("/rackets")
-                  : pathname.startsWith(item.href);
+                : pathname.startsWith(item.href);
 
             return (
               <Link
@@ -63,27 +58,11 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <Link
-            href="/?q="
-            className="hidden size-10 items-center justify-center rounded-full border border-transparent transition hover:border-border hover:bg-card sm:flex"
-            aria-label="Search"
-          >
-            <Search className="size-5" strokeWidth={1.9} />
-          </Link>
           <button
             type="button"
-            className="hidden h-10 items-center gap-2 rounded-full border border-border bg-card px-4 text-sm font-semibold transition hover:border-primary/40 lg:flex"
+            className="hidden h-11 rounded-xl bg-accent px-5 text-sm font-bold text-accent-foreground transition hover:bg-accent/85 md:inline-flex md:items-center"
           >
-            <UserRound className="size-4" strokeWidth={1.9} />
-            Sign in
-          </button>
-          <button
-            type="button"
-            className="flex h-10 items-center gap-2 rounded-full border border-primary/40 bg-card px-4 text-sm font-semibold text-primary transition hover:bg-secondary"
-            aria-label="Saved rackets"
-          >
-            <Heart className="size-4" strokeWidth={1.9} />
-            <span>0</span>
+            Find your racket
           </button>
           <ThemeToggle />
         </div>

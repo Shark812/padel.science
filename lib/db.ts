@@ -74,7 +74,17 @@ export type RacketDetail = RacketSearchResult & {
   }>;
 };
 
-export async function searchRackets(query: string | null, limit = 96) {
+export type HeroRacket = {
+  unified_id: string;
+  canonical_name: string;
+  image_url: string;
+  overall_rating_avg: string | null;
+};
+
+export async function searchRackets(query: string | null, limit: number | null = 96) {
+  const limitClause = typeof limit === "number" ? "LIMIT $2" : "";
+  const queryParams = typeof limit === "number" ? [query, limit] : [query];
+
   const { rows } = await pool.query<RacketSearchResult>(
     `
       SELECT
@@ -109,12 +119,30 @@ export async function searchRackets(query: string | null, limit = 96) {
         re.reliability_score DESC,
         re.source_count DESC,
         re.canonical_name ASC
-      LIMIT $2
+      ${limitClause}
     `,
-    [query, limit],
+    queryParams,
   );
 
   return rows;
+}
+
+export async function getRandomHeroRacket() {
+  const { rows } = await pool.query<HeroRacket>(
+    `
+      SELECT
+        re.unified_id,
+        re.canonical_name,
+        re.image_url,
+        re.overall_rating_avg
+      FROM app.rackets_enriched re
+      WHERE re.image_url IS NOT NULL AND TRIM(re.image_url) <> ''
+      ORDER BY random()
+      LIMIT 1
+    `,
+  );
+
+  return rows[0] ?? null;
 }
 
 export async function getRacketDetail(unifiedId: string) {
@@ -137,5 +165,5 @@ export function toScore(value: string | number | null | undefined) {
 
 export function formatScore(value: string | number | null | undefined) {
   const score = toScore(value);
-  return score === null ? "n.d." : score.toFixed(1);
+  return score === null ? "N/A" : score.toFixed(1);
 }

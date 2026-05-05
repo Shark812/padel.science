@@ -1,9 +1,10 @@
+import Link from "next/link";
 import { BarChart3, Database, Search, ShieldCheck, Scale } from "lucide-react";
 
 import { SearchResultsPanel } from "@/components/search-results-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { searchRackets } from "@/lib/db";
+import { getRandomHeroRacket, searchRackets } from "@/lib/db";
 
 type HomeProps = {
   searchParams: Promise<{
@@ -25,17 +26,21 @@ export default async function Home({ searchParams }: HomeProps) {
   const query = params.q?.trim() ?? "";
   const requestedSort = params.sort?.trim() ?? "overall";
 
-  const rackets = await searchRackets(query || null);
-  const heroRacket = rackets.find((racket) => racket.image_url) ?? rackets[0];
+  const [rackets, randomHeroRacket] = await Promise.all([
+    searchRackets(query || null, null),
+    getRandomHeroRacket(),
+  ]);
+
+  const heroRacket = randomHeroRacket ?? rackets.find((racket) => racket.image_url) ?? rackets[0];
   const heroScore = heroRacket?.overall_rating_avg
-    ? Number.parseFloat(heroRacket.overall_rating_avg).toFixed(0)
+    ? Number.parseFloat(heroRacket.overall_rating_avg).toFixed(1)
     : "92";
   const activeSortValue =
     sortOptions.find((option) => option.value === requestedSort)?.value ?? sortOptions[0].value;
 
   return (
     <main className="min-h-[100dvh] bg-background">
-      <section className="hero-shell relative overflow-hidden border-b border-border/70">
+      <section className="hero-shell relative overflow-hidden lg:overflow-visible">
         <div className="hero-grid absolute inset-0" />
         <div className="hero-wave hero-wave-primary absolute right-[-6%] top-20 hidden h-56 w-[68%] lg:block" />
         <div className="hero-wave hero-wave-accent absolute right-4 top-44 hidden h-32 w-[56%] lg:block" />
@@ -44,15 +49,15 @@ export default async function Home({ searchParams }: HomeProps) {
         <div className="ps-container relative grid min-h-[505px] items-center gap-10 pb-28 pt-14 lg:grid-cols-[0.9fr_1.1fr]">
           <div className="z-10">
             <h1 className="max-w-2xl text-balance font-heading text-5xl font-bold leading-[1.02] tracking-tight text-foreground md:text-7xl">
-              Trova la racchetta da padel giusta, con <span className="text-accent">dati chiari.</span>
+              Find the right padel racket, with <span className="text-accent">clear data.</span>
             </h1>
             <p className="mt-5 max-w-xl text-lg leading-8 text-muted-foreground">
-              Scopri, valuta e confronta le racchette con metriche oggettive
-              e fonti verificate.
+              Discover, evaluate, and compare rackets using objective metrics
+              and verified sources.
             </p>
             <div className="mt-5 flex items-center gap-2 text-sm font-semibold text-foreground">
               <ShieldCheck className="size-5 text-primary" strokeWidth={1.9} />
-              Dati unificati. Metodologia trasparente. Scelte migliori.
+              Unified data. Transparent methodology. Better decisions.
             </div>
           </div>
 
@@ -69,11 +74,17 @@ export default async function Home({ searchParams }: HomeProps) {
                   />
                 ))}
               </div>
-              <img
-                src={heroRacket.image_url}
-                alt={heroRacket.canonical_name}
-                className="absolute left-1/2 top-0 h-60 w-44 -translate-x-1/2 rotate-[12deg] object-contain"
-              />
+              <Link
+                href={`/rackets/${heroRacket.unified_id}`}
+                aria-label={`Open details for ${heroRacket.canonical_name}`}
+                className="absolute left-1/2 top-0 h-60 w-44 -translate-x-1/2 rotate-[12deg]"
+              >
+                <img
+                  src={heroRacket.image_url}
+                  alt={heroRacket.canonical_name}
+                  className="h-full w-full object-contain"
+                />
+              </Link>
             </div>
           ) : null}
 
@@ -96,11 +107,17 @@ export default async function Home({ searchParams }: HomeProps) {
             </div>
             <div className="absolute right-[10%] top-[205px] size-24 rounded-full bg-accent shadow-xl shadow-accent/25 ring-8 ring-accent/15" />
             {heroRacket?.image_url ? (
-              <img
-                src={heroRacket.image_url}
-                alt={heroRacket.canonical_name}
-                className="absolute right-[18%] top-[-8px] h-[430px] w-[310px] rotate-[15deg] object-contain"
-              />
+              <Link
+                href={`/rackets/${heroRacket.unified_id}`}
+                aria-label={`Open details for ${heroRacket.canonical_name}`}
+                className="absolute right-[18%] top-[-8px] h-[430px] w-[310px] rotate-[15deg]"
+              >
+                <img
+                  src={heroRacket.image_url}
+                  alt={heroRacket.canonical_name}
+                  className="h-full w-full object-contain"
+                />
+              </Link>
             ) : (
               <>
                 <div className="absolute right-20 top-0 h-[340px] w-[190px] rotate-[16deg] rounded-[52%_48%_42%_58%/54%_55%_45%_46%] border-[18px] border-foreground/85 bg-[radial-gradient(circle,var(--foreground)_0_4px,transparent_5px)] bg-[size:26px_26px] opacity-90 shadow-2xl shadow-primary/20" />
@@ -111,7 +128,7 @@ export default async function Home({ searchParams }: HomeProps) {
 
           <form
             action="/"
-            className="surface-card order-2 col-span-full mx-auto grid w-full max-w-6xl grid-cols-1 gap-3 rounded-2xl p-3 md:grid-cols-[minmax(0,1fr)_190px] lg:order-none lg:-mb-44"
+            className="surface-card order-2 col-span-full mx-auto grid w-full max-w-6xl grid-cols-1 gap-2 rounded-2xl p-2 md:grid-cols-[minmax(0,1fr)_190px] lg:order-none lg:-mb-44"
           >
             <input type="hidden" name="sort" value={activeSortValue} />
             <label className="sr-only" htmlFor="q">
@@ -127,13 +144,13 @@ export default async function Home({ searchParams }: HomeProps) {
                 id="q"
                 name="q"
                 defaultValue={query}
-                placeholder="Cerca per brand, modello o famiglia..."
-                className="h-[4.5rem] border-0 bg-transparent pl-14 text-lg shadow-none focus-visible:ring-0"
+                placeholder="Search by brand, model, or family..."
+                className="h-16 border-0 bg-transparent pl-14 text-lg shadow-none focus-visible:ring-0"
               />
             </div>
-            <Button type="submit" className="h-[4.5rem] gap-2 rounded-xl bg-accent px-10 text-base font-bold text-accent-foreground hover:bg-accent/85">
+            <Button type="submit" className="h-16 gap-2 rounded-xl bg-accent px-10 text-base font-bold text-accent-foreground hover:bg-accent/85">
               <Search className="size-5" />
-              Cerca
+              Search
             </Button>
           </form>
         </div>
@@ -141,10 +158,10 @@ export default async function Home({ searchParams }: HomeProps) {
 
       <section className="ps-container mt-24 grid gap-3 md:grid-cols-4">
         {[
-          { icon: Database, title: "Catalogo unificato", copy: "Dati raccolti da fonti ufficiali e test indipendenti." },
-          { icon: ShieldCheck, title: "Profili affidabili", copy: "Rating di affidabilita e metodologia trasparente." },
-          { icon: Scale, title: "Confronto rapido", copy: "Aggiungi 2 racchette e confrontale fianco a fianco." },
-          { icon: BarChart3, title: "Metriche chiare", copy: "Potenza, controllo, sweet spot e molto altro." },
+          { icon: Database, title: "Unified catalog", copy: "Data gathered from official sources and independent tests." },
+          { icon: ShieldCheck, title: "Reliable profiles", copy: "Transparent reliability ratings and methodology." },
+          { icon: Scale, title: "Fast comparison", copy: "Add up to 2 rackets and compare them side by side." },
+          { icon: BarChart3, title: "Clear metrics", copy: "Power, control, sweet spot, and more in one view." },
         ].map((item) => (
           <div key={item.title} className="surface-card grid grid-cols-[48px_1fr] items-center gap-4 rounded-xl p-5">
             <div className="flex size-12 items-center justify-center rounded-lg bg-secondary text-primary">
