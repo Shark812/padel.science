@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { Search } from "lucide-react";
+import { BarChart3, Database, Search, ShieldCheck, Scale } from "lucide-react";
 
 import { SearchResultsPanel } from "@/components/search-results-panel";
 import { Button } from "@/components/ui/button";
@@ -26,28 +25,93 @@ export default async function Home({ searchParams }: HomeProps) {
   const query = params.q?.trim() ?? "";
   const requestedSort = params.sort?.trim() ?? "overall";
 
-  const rackets = query ? await searchRackets(query) : [];
+  const rackets = await searchRackets(query || null);
+  const heroRacket = rackets.find((racket) => racket.image_url) ?? rackets[0];
+  const heroScore = heroRacket?.overall_rating_avg
+    ? Number.parseFloat(heroRacket.overall_rating_avg).toFixed(0)
+    : "92";
   const activeSortValue =
     sortOptions.find((option) => option.value === requestedSort)?.value ?? sortOptions[0].value;
 
   return (
-    <main className="min-h-[100dvh] bg-[radial-gradient(circle_at_15%_10%,hsl(var(--primary)/0.18),transparent_32%),linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--muted))_100%)] px-5 py-8">
-      <section className="mx-auto flex min-h-[calc(100dvh-4rem)] max-w-6xl flex-col justify-center">
-        <div className="mx-auto w-full max-w-3xl text-center">
-          <p className="mb-4 text-sm font-medium uppercase tracking-[0.18em] text-primary">
-            Padel Portal
-          </p>
-          <h1 className="text-4xl font-semibold tracking-tight text-foreground md:text-6xl">
-            Find a racket.
-          </h1>
-          <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-muted-foreground">
-            Search the local database and browse unified models collected from
-            the available padel sources.
-          </p>
+    <main className="min-h-[100dvh] bg-background">
+      <section className="hero-shell relative overflow-hidden border-b border-border/70">
+        <div className="hero-grid absolute inset-0" />
+        <div className="hero-wave hero-wave-primary absolute right-[-6%] top-20 hidden h-56 w-[68%] lg:block" />
+        <div className="hero-wave hero-wave-accent absolute right-4 top-44 hidden h-32 w-[56%] lg:block" />
+        <div className="absolute right-0 top-24 hidden h-72 w-[48%] bg-[radial-gradient(circle_at_center,color-mix(in_oklab,var(--primary)_18%,transparent),transparent_68%)] blur-2xl lg:block" />
+
+        <div className="ps-container relative grid min-h-[505px] items-center gap-10 pb-28 pt-14 lg:grid-cols-[0.9fr_1.1fr]">
+          <div className="z-10">
+            <h1 className="max-w-2xl text-balance font-heading text-5xl font-bold leading-[1.02] tracking-tight text-foreground md:text-7xl">
+              Trova la racchetta da padel giusta, con <span className="text-accent">dati chiari.</span>
+            </h1>
+            <p className="mt-5 max-w-xl text-lg leading-8 text-muted-foreground">
+              Scopri, valuta e confronta le racchette con metriche oggettive
+              e fonti verificate.
+            </p>
+            <div className="mt-5 flex items-center gap-2 text-sm font-semibold text-foreground">
+              <ShieldCheck className="size-5 text-primary" strokeWidth={1.9} />
+              Dati unificati. Metodologia trasparente. Scelte migliori.
+            </div>
+          </div>
+
+          {heroRacket?.image_url ? (
+            <div className="order-3 relative z-0 mx-auto h-56 w-full max-w-sm lg:hidden">
+              <div className="absolute inset-x-6 bottom-4 h-20 bg-primary/10 blur-2xl" />
+              <div className="absolute right-7 top-20 size-16 rounded-full bg-accent shadow-lg shadow-accent/25 ring-8 ring-accent/15" />
+              <div className="absolute bottom-6 left-8 right-20 flex h-20 items-end gap-2 opacity-60">
+                {[34, 52, 72, 44, 84, 64, 94].map((height, index) => (
+                  <span
+                    key={`mobile-bar-${index}`}
+                    className="w-4 rounded-t-md bg-primary/18"
+                    style={{ height }}
+                  />
+                ))}
+              </div>
+              <img
+                src={heroRacket.image_url}
+                alt={heroRacket.canonical_name}
+                className="absolute left-1/2 top-0 h-60 w-44 -translate-x-1/2 rotate-[12deg] object-contain"
+              />
+            </div>
+          ) : null}
+
+          <div className="hero-product relative hidden min-h-[360px] lg:block">
+            <div className="absolute bottom-6 left-10 right-10 h-28 bg-primary/10 blur-2xl" />
+            <div className="absolute bottom-16 left-4 right-24 flex h-32 items-end gap-3 opacity-60">
+              {[38, 56, 74, 98, 64, 116, 84, 132, 68, 104, 92, 122].map((height, index) => (
+                <span
+                  key={`bar-${index}`}
+                  className="w-5 rounded-t-md bg-primary/18"
+                  style={{ height }}
+                />
+              ))}
+            </div>
+            <div className="absolute right-[29%] top-4 h-20 w-20 rounded-full border border-primary/20 bg-card/65 shadow-lg shadow-primary/10 backdrop-blur-md">
+              <div className="flex h-full flex-col items-center justify-center">
+                <span className="font-mono text-2xl font-bold text-primary">{heroScore}</span>
+                <span className="text-[10px] font-semibold text-muted-foreground">score</span>
+              </div>
+            </div>
+            <div className="absolute right-[10%] top-[205px] size-24 rounded-full bg-accent shadow-xl shadow-accent/25 ring-8 ring-accent/15" />
+            {heroRacket?.image_url ? (
+              <img
+                src={heroRacket.image_url}
+                alt={heroRacket.canonical_name}
+                className="absolute right-[18%] top-[-8px] h-[430px] w-[310px] rotate-[15deg] object-contain"
+              />
+            ) : (
+              <>
+                <div className="absolute right-20 top-0 h-[340px] w-[190px] rotate-[16deg] rounded-[52%_48%_42%_58%/54%_55%_45%_46%] border-[18px] border-foreground/85 bg-[radial-gradient(circle,var(--foreground)_0_4px,transparent_5px)] bg-[size:26px_26px] opacity-90 shadow-2xl shadow-primary/20" />
+                <div className="absolute right-32 top-[254px] h-36 w-9 rotate-[16deg] rounded-b-xl bg-foreground/85" />
+              </>
+            )}
+          </div>
 
           <form
             action="/"
-            className="mt-10 grid grid-cols-[1fr_auto] gap-3 rounded-2xl border border-border bg-card p-2 shadow-[0_24px_80px_-48px_hsl(var(--foreground)/0.45)]"
+            className="surface-card order-2 col-span-full mx-auto grid w-full max-w-6xl grid-cols-1 gap-3 rounded-2xl p-3 md:grid-cols-[minmax(0,1fr)_190px] lg:order-none lg:-mb-44"
           >
             <input type="hidden" name="sort" value={activeSortValue} />
             <label className="sr-only" htmlFor="q">
@@ -63,25 +127,43 @@ export default async function Home({ searchParams }: HomeProps) {
                 id="q"
                 name="q"
                 defaultValue={query}
-                placeholder="Bullpadel Vertex, Adidas Metalbone..."
-                className="h-13 border-0 pl-12 text-base shadow-none focus-visible:ring-0"
+                placeholder="Cerca per brand, modello o famiglia..."
+                className="h-[4.5rem] border-0 bg-transparent pl-14 text-lg shadow-none focus-visible:ring-0"
               />
             </div>
-            <Button type="submit" className="h-13 px-6 active:translate-y-px">
-              Search
+            <Button type="submit" className="h-[4.5rem] gap-2 rounded-xl bg-accent px-10 text-base font-bold text-accent-foreground hover:bg-accent/85">
+              <Search className="size-5" />
+              Cerca
             </Button>
           </form>
         </div>
-
-        {query ? (
-          <SearchResultsPanel
-            query={query}
-            rackets={rackets}
-            sortOptions={sortOptions}
-            initialSortValue={activeSortValue}
-          />
-        ) : null}
       </section>
+
+      <section className="ps-container mt-24 grid gap-3 md:grid-cols-4">
+        {[
+          { icon: Database, title: "Catalogo unificato", copy: "Dati raccolti da fonti ufficiali e test indipendenti." },
+          { icon: ShieldCheck, title: "Profili affidabili", copy: "Rating di affidabilita e metodologia trasparente." },
+          { icon: Scale, title: "Confronto rapido", copy: "Aggiungi 2 racchette e confrontale fianco a fianco." },
+          { icon: BarChart3, title: "Metriche chiare", copy: "Potenza, controllo, sweet spot e molto altro." },
+        ].map((item) => (
+          <div key={item.title} className="surface-card grid grid-cols-[48px_1fr] items-center gap-4 rounded-xl p-5">
+            <div className="flex size-12 items-center justify-center rounded-lg bg-secondary text-primary">
+              <item.icon className="size-7" strokeWidth={1.7} />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-foreground">{item.title}</h2>
+              <p className="mt-1 text-sm leading-5 text-muted-foreground">{item.copy}</p>
+            </div>
+          </div>
+        ))}
+      </section>
+
+      <SearchResultsPanel
+        query={query}
+        rackets={rackets}
+        sortOptions={sortOptions}
+        initialSortValue={activeSortValue}
+      />
     </main>
   );
 }

@@ -74,7 +74,7 @@ export type RacketDetail = RacketSearchResult & {
   }>;
 };
 
-export async function searchRackets(query: string | null) {
+export async function searchRackets(query: string | null, limit = 96) {
   const { rows } = await pool.query<RacketSearchResult>(
     `
       SELECT
@@ -109,8 +109,9 @@ export async function searchRackets(query: string | null) {
         re.reliability_score DESC,
         re.source_count DESC,
         re.canonical_name ASC
+      LIMIT $2
     `,
-    [query],
+    [query, limit],
   );
 
   return rows;

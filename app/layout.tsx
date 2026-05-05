@@ -1,17 +1,20 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, DM_Sans, Roboto_Slab } from "next/font/google";
+import { DM_Sans, Geist_Mono, Roboto_Slab } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { SiteHeader } from "@/components/site-header";
 
-const robotoSlabHeading = Roboto_Slab({subsets:['latin'],variable:'--font-heading'});
-
-const dmSans = DM_Sans({subsets:['latin'],variable:'--font-sans'});
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const robotoSlabHeading = Roboto_Slab({
   subsets: ["latin"],
+  variable: "--font-display",
+  weight: ["500", "600", "700"],
+});
+
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  variable: "--font-dm-sans",
+  weight: ["400", "500", "600", "700", "800"],
 });
 
 const geistMono = Geist_Mono({
@@ -20,8 +23,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Padel Portal",
-  description: "Padel racket catalog connected to the local database.",
+  title: "padel.science",
+  description: "Objective padel racket catalog, comparison, and reliability scores.",
 };
 
 export default function RootLayout({
@@ -35,13 +38,9 @@ export default function RootLayout({
       suppressHydrationWarning
       className={cn("font-sans", dmSans.variable, robotoSlabHeading.variable)}
     >
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${geistMono.variable} antialiased`}>
         <ThemeProvider>
-          <header className="sticky top-0 z-50 border-b border-border bg-background/90 backdrop-blur">
-            <div className="mx-auto flex h-14 w-full max-w-7xl items-center justify-end px-4">
-              <ThemeToggle />
-            </div>
-          </header>
+          <SiteHeader />
           {children}
         </ThemeProvider>
       </body>
