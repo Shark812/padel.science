@@ -34,6 +34,15 @@ SPEC_CARD_PATTERN = re.compile(
     r'<p class="text-sm">([^<]+)</p>\s*</div>',
     re.DOTALL | re.IGNORECASE,
 )
+META_DESCRIPTION_PATTERN = re.compile(
+    r'<meta name="description" content="([^"]*)"',
+    re.IGNORECASE,
+)
+OG_DESCRIPTION_PATTERN = re.compile(
+    r'<meta property="og:description" content="([^"]*)"',
+    re.IGNORECASE,
+)
+PARAGRAPH_PATTERN = re.compile(r"<p[^>]*>(.*?)</p>", re.DOTALL | re.IGNORECASE)
 
 
 def build_session() -> requests.Session:
@@ -100,6 +109,50 @@ def normalize_image_url(image: Any, page_url: str) -> str | None:
     return urljoin(page_url, image.strip())
 
 
+def strip_tags(text: str) -> str:
+    without_tags = re.sub(r"<[^>]+>", " ", text)
+    return html.unescape(re.sub(r"\s+", " ", without_tags)).strip()
+
+
+def extract_first(pattern: re.Pattern[str], text: str) -> str | None:
+    match = pattern.search(text)
+    if not match:
+        return None
+    value = html.unescape(match.group(1)).strip()
+    return value or None
+
+
+def extract_description(page_html: str, fallback: str | None) -> str | None:
+    paragraphs: list[str] = []
+    excluded_fragments = [
+        "Open menu",
+        "Buyer's guide",
+        "Padelful API",
+        "Manage cookies",
+        '"@context"',
+        "I want it",
+        "I have it",
+        "Are you a store owner?",
+        "shipping cost not calculated",
+    ]
+    for raw_paragraph in PARAGRAPH_PATTERN.findall(page_html):
+        text = strip_tags(raw_paragraph)
+        if len(text) < 80:
+            continue
+        if any(fragment in text for fragment in excluded_fragments):
+            continue
+        paragraphs.append(text)
+
+    if paragraphs:
+        return "\n\n".join(paragraphs)
+
+    return (
+        fallback
+        or extract_first(OG_DESCRIPTION_PATTERN, page_html)
+        or extract_first(META_DESCRIPTION_PATTERN, page_html)
+    )
+
+
 def extract_metrics(page_html: str) -> dict[str, float]:
     metric_name_map = {
         "Power": "power",
@@ -155,6 +208,7 @@ def parse_product(session: requests.Session, url: str) -> dict[str, Any]:
     review = product_json.get("review", {}) if isinstance(product_json, dict) else {}
     rating = review.get("reviewRating", {}) if isinstance(review, dict) else {}
     brand = product_json.get("brand", {}) if isinstance(product_json.get("brand"), dict) else {}
+    json_description = product_json.get("description")
 
     return {
         "source_portal": "padelful",
@@ -163,7 +217,10 @@ def parse_product(session: requests.Session, url: str) -> dict[str, Any]:
         "name": product_json.get("name"),
         "brand": brand.get("name"),
         "image_url": normalize_image_url(product_json.get("image"), url),
-        "description": product_json.get("description"),
+        "description": extract_description(
+            page_html,
+            json_description if isinstance(json_description, str) else None,
+        ),
         "published_at": review.get("datePublished"),
         "shape": specs.get("shape"),
         "weight_raw": specs.get("weight_raw"),
@@ -215,6 +272,7 @@ def summarize(records: list[dict[str, Any]]) -> dict[str, Any]:
         "with_name": filled("name"),
         "with_brand": filled("brand"),
         "with_image_url": filled("image_url"),
+        "with_description": filled("description"),
         "with_shape": filled("shape"),
         "with_weight_raw": filled("weight_raw"),
         "with_feel": filled("feel"),

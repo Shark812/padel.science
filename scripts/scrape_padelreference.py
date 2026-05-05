@@ -359,10 +359,10 @@ def parse_product(
     response.raise_for_status()
     page_html = response.text
     product_json = parse_json_ld(page_html)
-    description = html.unescape(product_json.get("description", "")).strip()
+    raw_description = html.unescape(product_json.get("description", "")).strip()
     specs = extract_specs_from_html(page_html, html_spec_aliases)
     description_specs = extract_specs_from_description(
-        description,
+        raw_description,
         spec_aliases,
         tech_sheet_marker,
         stop_markers,
@@ -371,7 +371,10 @@ def parse_product(
         specs.setdefault(key, value)
     canonical_url = extract_first(CANONICAL_PATTERN, page_html)
     final_url = response.url
+    meta_description = extract_first(META_DESCRIPTION_PATTERN, page_html)
+    og_description = extract_first(OG_DESCRIPTION_PATTERN, page_html)
     expert_notes = extract_expert_notes(page_html, expert_notes_label)
+    description = raw_description or expert_notes or og_description or meta_description
     ratings = extract_ratings(page_html, rating_labels)
 
     images = product_json.get("image", [])
@@ -394,8 +397,8 @@ def parse_product(
         "product_type": product_json.get("product_type"),
         "condition": product_json.get("condition"),
         "gtin": product_json.get("gtin") or None,
-        "meta_description": extract_first(META_DESCRIPTION_PATTERN, page_html),
-        "og_description": extract_first(OG_DESCRIPTION_PATTERN, page_html),
+        "meta_description": meta_description,
+        "og_description": og_description,
         "description": description,
         "expert_notes": expert_notes,
         "image_count": len(images),

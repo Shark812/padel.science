@@ -35,6 +35,15 @@ SPEC_PATTERN = re.compile(
     r"<p><b>\s*(Tacto|Forma|Peso)\s*:\s*</b>\s*([^<]+)</p>",
     re.DOTALL | re.IGNORECASE,
 )
+META_DESCRIPTION_PATTERN = re.compile(
+    r'<meta name="description" content="([^"]*)"',
+    re.IGNORECASE,
+)
+OG_DESCRIPTION_PATTERN = re.compile(
+    r'<meta property="og:description" content="([^"]*)"',
+    re.IGNORECASE,
+)
+PARAGRAPH_PATTERN = re.compile(r"<p[^>]*>(.*?)</p>", re.DOTALL | re.IGNORECASE)
 
 
 def build_session() -> requests.Session:
@@ -93,6 +102,52 @@ def normalize_image_url(image: Any, page_url: str) -> str | None:
     return urljoin(page_url, image.strip())
 
 
+def strip_tags(text: str) -> str:
+    without_tags = re.sub(r"<[^>]+>", " ", text)
+    return html.unescape(re.sub(r"\s+", " ", without_tags)).strip()
+
+
+def extract_first(pattern: re.Pattern[str], text: str) -> str | None:
+    match = pattern.search(text)
+    if not match:
+        return None
+    value = html.unescape(match.group(1)).strip()
+    return value or None
+
+
+def extract_description(page_html: str, fallback: str | None) -> str | None:
+    paragraphs: list[str] = []
+    excluded_fragments = [
+        "Top palas",
+        "PalaFinder",
+        "Palas >",
+        "Lista de comparación",
+        "Subscríbete",
+        "Deja aquí tu email",
+        "Bases del concurso",
+        "Privacy Overview",
+        "Necessary cookies",
+        "Advertisement cookies",
+        "objetitopala",
+    ]
+    for raw_paragraph in PARAGRAPH_PATTERN.findall(page_html):
+        text = strip_tags(raw_paragraph)
+        if len(text) < 80:
+            continue
+        if any(fragment in text for fragment in excluded_fragments):
+            continue
+        paragraphs.append(text)
+
+    if paragraphs:
+        return "\n\n".join(paragraphs)
+
+    return (
+        fallback
+        or extract_first(OG_DESCRIPTION_PATTERN, page_html)
+        or extract_first(META_DESCRIPTION_PATTERN, page_html)
+    )
+
+
 def extract_scores(page_html: str) -> dict[str, float]:
     score_name_map = {
         "Potencia": "power",
@@ -149,6 +204,7 @@ def parse_product(session: requests.Session, url: str) -> dict[str, Any]:
     offers = product_json.get("offers", {}) if isinstance(product_json.get("offers"), dict) else {}
 
     brand_name = brand.get("name") if isinstance(brand, dict) else product_json.get("brand")
+    json_description = product_json.get("description")
 
     return {
         "source_portal": "padelzoom",
@@ -157,6 +213,10 @@ def parse_product(session: requests.Session, url: str) -> dict[str, Any]:
         "name": product_json.get("name"),
         "brand": brand_name,
         "image_url": normalize_image_url(product_json.get("image"), url),
+        "description": extract_description(
+            page_html,
+            json_description if isinstance(json_description, str) else None,
+        ),
         "currency": offers.get("priceCurrency"),
         "price_low_eur": parse_float(str(offers.get("lowPrice"))) if offers.get("lowPrice") not in (None, "") else None,
         "price_high_eur": parse_float(str(offers.get("highPrice"))) if offers.get("highPrice") not in (None, "") else None,
@@ -207,6 +267,7 @@ def summarize(records: list[dict[str, Any]]) -> dict[str, Any]:
         "name",
         "brand",
         "image_url",
+        "description",
         "overall_rating",
         "power",
         "control",

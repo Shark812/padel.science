@@ -41,6 +41,14 @@ MANUFACTURER_PATTERN = re.compile(
 PRODUCT_ID_PATTERN = re.compile(r'"id_product"\s*:\s*(\d+)', re.DOTALL)
 PRICE_PATTERN = re.compile(r'"price_tax_incl"\s*:\s*([\d.]+)', re.DOTALL)
 SCORE_PATTERN = re.compile(r'"score"\s*:\s*([\d.]+)', re.DOTALL)
+META_DESCRIPTION_PATTERN = re.compile(
+    r'<meta name="description" content="([^"]*)"',
+    re.IGNORECASE,
+)
+OG_DESCRIPTION_PATTERN = re.compile(
+    r'<meta property="og:description" content="([^"]*)"',
+    re.IGNORECASE,
+)
 
 
 def build_session() -> requests.Session:
@@ -115,6 +123,27 @@ def extract_first(pattern: re.Pattern[str], text: str) -> str | None:
     return match.group(1)
 
 
+def parse_product_json_ld(page_html: str) -> dict[str, Any]:
+    for raw_json in JSON_LD_SCRIPT_PATTERN.findall(page_html):
+        try:
+            parsed = json.loads(raw_json)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict) and parsed.get("@type") == "Product":
+            return parsed
+    return {}
+
+
+def extract_meta_description(page_html: str) -> str | None:
+    raw_value = extract_first(OG_DESCRIPTION_PATTERN, page_html) or extract_first(
+        META_DESCRIPTION_PATTERN,
+        page_html,
+    )
+    if not raw_value:
+        return None
+    return html.unescape(raw_value).strip()
+
+
 def normalize_float(value: str | None) -> float | None:
     if not value:
         return None
@@ -133,6 +162,7 @@ def slug_from_url(url: str) -> str:
 
 def parse_product(session: requests.Session, url: str) -> dict[str, Any]:
     page_html = fetch_text(session, url)
+    product_json = parse_product_json_ld(page_html)
     match = XCOMPARE_PATTERN.search(page_html)
     if not match:
         raise ValueError("xcompareHookData block not found")
@@ -172,6 +202,7 @@ def parse_product(session: requests.Session, url: str) -> dict[str, Any]:
         "product_id": normalize_int(extract_first(PRODUCT_ID_PATTERN, current_product_block)),
         "name": decode_json_string(extract_first(PRODUCT_NAME_PATTERN, current_product_block)),
         "brand": decode_json_string(extract_first(MANUFACTURER_PATTERN, current_product_block)),
+        "description": product_json.get("description") or extract_meta_description(page_html),
         "price_eur": normalize_float(extract_first(PRICE_PATTERN, current_product_block)),
         "score": normalize_float(extract_first(SCORE_PATTERN, current_product_block)),
         **ratings,
@@ -212,6 +243,7 @@ def summarize(records: list[dict[str, Any]]) -> dict[str, Any]:
         "products": len(records),
         "with_name": filled("name"),
         "with_brand": filled("brand"),
+        "with_description": filled("description"),
         "with_price": filled("price_eur"),
         "with_score": filled("score"),
         "with_power": filled("power"),
