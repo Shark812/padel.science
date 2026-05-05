@@ -4,6 +4,7 @@ import { BarChart3, Database, Search, ShieldCheck, Scale } from "lucide-react";
 import { SearchResultsPanel } from "@/components/search-results-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { StarsBackground } from "@/components/ui/stars-background";
 import { getRandomHeroRacket, searchRackets } from "@/lib/db";
 
 type HomeProps = {
@@ -40,13 +41,20 @@ export default async function Home({ searchParams }: HomeProps) {
 
   return (
     <main className="min-h-[100dvh] bg-background">
-      <section className="hero-shell relative overflow-hidden lg:overflow-visible">
-        <div className="hero-grid absolute inset-0" />
-        <div className="hero-wave hero-wave-primary absolute right-[-6%] top-20 hidden h-56 w-[68%] lg:block" />
-        <div className="hero-wave hero-wave-accent absolute right-4 top-44 hidden h-32 w-[56%] lg:block" />
-        <div className="absolute right-0 top-24 hidden h-72 w-[48%] bg-[radial-gradient(circle_at_center,color-mix(in_oklab,var(--primary)_18%,transparent),transparent_68%)] blur-2xl lg:block" />
+      <section className="hero-shell relative isolate overflow-hidden lg:overflow-visible">
+        <div className="absolute inset-0 z-0 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--background)_34%,transparent),color-mix(in_oklab,var(--background)_82%,transparent)_100%)] dark:bg-[linear-gradient(180deg,color-mix(in_oklab,var(--background)_8%,transparent),color-mix(in_oklab,var(--background)_72%,transparent)_100%)]" />
+        <StarsBackground
+          pointerEvents={false}
+          factor={0.035}
+          speed={44}
+          className="z-[1] text-primary/60 opacity-90 dark:text-white/70 dark:opacity-80"
+        />
+        <div className="hero-grid absolute inset-0 z-[2]" />
+        <div className="hero-wave hero-wave-primary absolute right-[-6%] top-20 z-[2] hidden h-56 w-[68%] lg:block" />
+        <div className="hero-wave hero-wave-accent absolute right-4 top-44 z-[2] hidden h-32 w-[56%] lg:block" />
+        <div className="absolute right-0 top-24 z-[2] hidden h-72 w-[48%] bg-[radial-gradient(circle_at_center,color-mix(in_oklab,var(--primary)_18%,transparent),transparent_68%)] blur-2xl lg:block" />
 
-        <div className="ps-container relative grid min-h-[505px] items-center gap-10 pb-28 pt-14 lg:grid-cols-[0.9fr_1.1fr]">
+        <div className="ps-container relative z-10 grid min-h-[505px] items-center gap-10 pb-28 pt-14 lg:grid-cols-[0.9fr_1.1fr]">
           <div className="z-10">
             <h1 className="max-w-2xl text-balance font-heading text-5xl font-bold leading-[1.02] tracking-tight text-foreground md:text-7xl">
               Find the right padel racket, with <span className="text-accent">clear data.</span>

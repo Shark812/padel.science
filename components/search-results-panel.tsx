@@ -72,7 +72,7 @@ function score(value: string | number | null | undefined) {
 
 function scoreText(value: string | number | null | undefined) {
   const parsed = score(value);
-  return parsed === null ? "N/A" : parsed.toFixed(0);
+  return parsed === null ? "N/A" : parsed.toFixed(1);
 }
 
 function overallScoreText(value: string | number | null | undefined) {

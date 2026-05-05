@@ -42,7 +42,12 @@ function normalized(value: number | null) {
 }
 
 function metricText(value: number | null) {
-  return value === null ? "N/A" : value.toFixed(0);
+  return value === null ? "N/A" : value.toFixed(1);
+}
+
+function reliabilityText(value: number | null | undefined) {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "N/A";
+  return Math.round(value).toString();
 }
 
 export default async function RacketPage({ params }: RacketPageProps) {
@@ -62,7 +67,9 @@ export default async function RacketPage({ params }: RacketPageProps) {
     { label: "Comfort", value: toScore(racket.comfort_avg), icon: CheckCircle2 },
   ];
   const overall = toScore(racket.overall_rating_avg);
-  const similar = (await searchRackets(racket.brand_name)).filter((item) => item.unified_id !== racket.unified_id).slice(0, 3);
+  const moreFromBrand = (await searchRackets(racket.brand_name))
+    .filter((item) => item.unified_id !== racket.unified_id && item.brand_name === racket.brand_name)
+    .slice(0, 3);
 
   return (
     <main className="min-h-[100dvh] bg-background py-6">
@@ -123,15 +130,15 @@ export default async function RacketPage({ params }: RacketPageProps) {
             <div className="mt-7 grid gap-5 md:grid-cols-[220px_1fr] md:items-center">
               <div>
                 <div className="flex items-end gap-2">
-                  <span className="font-mono text-7xl font-bold leading-none text-primary">{overall === null ? "N/A" : overall.toFixed(0)}</span>
-                  <span className="pb-3 text-2xl text-muted-foreground">/100</span>
+                  <span className="font-mono text-7xl font-bold leading-none text-primary">{metricText(overall)}</span>
+                  <span className="pb-3 text-2xl text-muted-foreground">/10</span>
                 </div>
                 <p className="mt-1 text-lg text-foreground">Overall score</p>
               </div>
               <div className="rounded-2xl border border-border bg-card p-5">
                 <p className="text-base font-bold">Reliability</p>
                 <div className="mt-2 flex items-end gap-1">
-                  <span className="font-mono text-4xl font-bold text-primary">{racket.reliability_score}.0</span>
+                  <span className="font-mono text-4xl font-bold text-primary">{reliabilityText(racket.reliability_score)}</span>
                   <span className="pb-1 text-muted-foreground">/5</span>
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">High confidence</p>
@@ -141,7 +148,7 @@ export default async function RacketPage({ params }: RacketPageProps) {
             <p className="mt-6 max-w-3xl text-base leading-7 text-foreground/82">
               The {racket.canonical_name} is profiled from unified public sources and normalized
               across the core padel metrics. It is best suited to players who want a clear view of
-              performance tradeoffs before comparing similar rackets.
+              performance tradeoffs before comparing other rackets.
             </p>
 
             <div className="mt-7 grid gap-3 md:grid-cols-2">
@@ -163,7 +170,7 @@ export default async function RacketPage({ params }: RacketPageProps) {
                   <stat.icon className="size-6 text-primary" strokeWidth={1.8} />
                   <p className="mt-2 text-xs font-bold">{stat.label}</p>
                   <p className="font-mono text-2xl font-bold text-primary">
-                    {metricText(stat.value)}<span className="text-sm text-muted-foreground">/100</span>
+                    {metricText(stat.value)}<span className="text-sm text-muted-foreground">/10</span>
                   </p>
                 </div>
               ))}
@@ -196,8 +203,26 @@ export default async function RacketPage({ params }: RacketPageProps) {
           </div>
 
           <div className="surface-card rounded-2xl p-6">
-            <h2 className="flex items-center gap-2 text-2xl font-extrabold tracking-tight">
-              <Sparkles className="size-6 text-primary" />
+            <h2 className="text-2xl font-extrabold tracking-tight">Technical specifications</h2>
+            <dl className="mt-5 grid overflow-hidden rounded-xl border border-border bg-card">
+              {details.map(([label, key]) => {
+                const value = racket[key];
+                if (!value) return null;
+                return (
+                  <div key={key} className="grid grid-cols-[140px_1fr] border-b border-border p-3 text-sm last:border-b-0">
+                    <dt className="font-semibold text-muted-foreground">{label}</dt>
+                    <dd className="font-medium text-foreground">{value}</dd>
+                  </div>
+                );
+              })}
+            </dl>
+          </div>
+        </section>
+
+        <section className="mt-5 grid gap-5 lg:grid-cols-[1fr_0.85fr]">
+          <div className="surface-card rounded-2xl p-6">
+            <h2 className="flex items-center gap-2 text-xl font-extrabold tracking-tight">
+              <Sparkles className="size-5 text-primary" />
               At a glance
             </h2>
             <div className="mt-5 grid gap-4">
@@ -213,24 +238,6 @@ export default async function RacketPage({ params }: RacketPageProps) {
                 </p>
               ))}
             </div>
-          </div>
-        </section>
-
-        <section className="mt-5 grid gap-5 lg:grid-cols-[1fr_0.85fr]">
-          <div className="surface-card rounded-2xl p-6">
-            <h2 className="text-xl font-extrabold tracking-tight">Technical specifications</h2>
-            <dl className="mt-5 grid overflow-hidden rounded-xl border border-border bg-card sm:grid-cols-2">
-              {details.map(([label, key]) => {
-                const value = racket[key];
-                if (!value) return null;
-                return (
-                  <div key={key} className="grid grid-cols-[150px_1fr] border-b border-border p-3 text-sm last:border-b-0 sm:[&:nth-last-child(-n+2)]:border-b-0">
-                    <dt className="font-semibold text-muted-foreground">{label}</dt>
-                    <dd className="font-medium text-foreground">{value}</dd>
-                  </div>
-                );
-              })}
-            </dl>
           </div>
 
           <div className="surface-card rounded-2xl p-6">
@@ -252,18 +259,18 @@ export default async function RacketPage({ params }: RacketPageProps) {
             </div>
             <div className="mt-5 flex items-center gap-4">
               <Progress value={racket.reliability_score * 20} className="h-2" />
-              <span className="font-mono font-bold text-primary">{racket.reliability_score}.0/5</span>
+              <span className="font-mono font-bold text-primary">{reliabilityText(racket.reliability_score)}/5</span>
             </div>
           </div>
         </section>
 
         <section className="mt-5 surface-card rounded-2xl p-6">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-xl font-extrabold tracking-tight">Similar rackets</h2>
+            <h2 className="text-xl font-extrabold tracking-tight">More from {racket.brand_name}</h2>
             <Link href="/" className="text-sm font-bold text-primary">View all</Link>
           </div>
           <div className="grid gap-4 md:grid-cols-3">
-            {similar.map((item) => (
+            {moreFromBrand.map((item) => (
               <Link key={item.unified_id} href={`/rackets/${item.unified_id}`} className="grid grid-cols-[88px_1fr] gap-4 rounded-xl border border-border bg-card p-4 transition hover:border-primary/40">
                 <div className="flex h-28 items-center justify-center rounded-lg bg-muted">
                   {item.image_url ? <img src={item.image_url} alt={item.canonical_name} className="max-h-24 max-w-20 object-contain" /> : null}
@@ -271,7 +278,7 @@ export default async function RacketPage({ params }: RacketPageProps) {
                 <div>
                   <p className="font-bold">{item.canonical_name}</p>
                   <p className="mt-1 text-sm text-muted-foreground">{item.shape ?? "Shape N/A"} - {item.level ?? "Level N/A"}</p>
-                  <p className="mt-3 font-mono text-2xl font-bold text-primary">{formatScore(item.overall_rating_avg)}<span className="text-sm text-muted-foreground">/100</span></p>
+                  <p className="mt-3 font-mono text-2xl font-bold text-primary">{formatScore(item.overall_rating_avg)}<span className="text-sm text-muted-foreground">/10</span></p>
                 </div>
               </Link>
             ))}
