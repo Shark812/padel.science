@@ -53,6 +53,8 @@ data/**/*.txt
 
 # Downloaded racket images are local/generated assets for now
 public/racket-images/
+public/racket-images-bg-removed/
+public/racket-images-bg-removed-batch-tool/
 
 # Keep data folders in repo structure if needed
 !data/**/.gitkeep
@@ -60,6 +62,9 @@ public/racket-images/
 # Runtime state and reports
 data/job-runs/
 data/source-state/
+data/debug-images/
+data/tmp/
+data/tmp/**
 
 # Optional local samples / scratch outputs
 data/*-sample/

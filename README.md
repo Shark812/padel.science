@@ -67,6 +67,12 @@ Download locale delle immagini e riscrittura di `image_url` con path serviti da 
 python .\scripts\download_racket_images.py
 ```
 
+Rimozione conservativa degli sfondi bianchi dalle immagini locali:
+
+```powershell
+npm run images:remove-bg -- --file public/racket-images/nome-file.webp --apply
+```
+
 Job notturno manuale:
 
 ```powershell

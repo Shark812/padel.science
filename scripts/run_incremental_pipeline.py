@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -13,12 +14,18 @@ import scrape_padelreference as padelreference
 import scrape_padelzoom as padelzoom
 import scrape_pala_hack as pala_hack
 import build_unified_rackets as unified_builder
-import download_racket_images as image_downloader
 
 
 ROOT = Path(__file__).resolve().parent.parent
+VENV_PYTHON = ROOT / "venv" / "Scripts" / "python.exe"
 STATE_DIR = ROOT / "data" / "source-state"
 LATEST_REPORT_PATH = STATE_DIR / "latest-incremental-report.json"
+
+
+def run_stage_and_publish_images() -> None:
+    script_path = ROOT / "scripts" / "stage_and_publish_racket_images.py"
+    python_executable = str(VENV_PYTHON) if VENV_PYTHON.exists() else sys.executable
+    subprocess.run([python_executable, str(script_path)], check=True, cwd=ROOT)
 
 
 def load_json_records(path: Path) -> list[dict[str, Any]]:
@@ -209,7 +216,7 @@ def main() -> None:
     did_rebuild_unified = added_records_total > 0
     if did_rebuild_unified:
         unified_builder.main()
-        image_downloader.sync_unified_racket_images()
+        run_stage_and_publish_images()
     report = {
         "sources": reports,
         "new_urls_total": sum(item["new_urls"] for item in reports),
