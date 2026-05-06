@@ -14,6 +14,7 @@ SCRIPTS = [
     ("scrape_pala_hack.py", ["--outdir", str(ROOT / "data/pala-hack-en-full")]),
     ("scrape_padelzoom.py", ["--outdir", str(ROOT / "data/padelzoom-es-full")]),
     ("build_unified_rackets.py", ["--outdir", str(ROOT / "data/unified-rackets")]),
+    ("download_racket_images.py", []),
 ]
 
 

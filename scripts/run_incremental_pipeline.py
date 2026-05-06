@@ -13,6 +13,7 @@ import scrape_padelreference as padelreference
 import scrape_padelzoom as padelzoom
 import scrape_pala_hack as pala_hack
 import build_unified_rackets as unified_builder
+import download_racket_images as image_downloader
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -208,6 +209,7 @@ def main() -> None:
     did_rebuild_unified = added_records_total > 0
     if did_rebuild_unified:
         unified_builder.main()
+        image_downloader.sync_unified_racket_images()
     report = {
         "sources": reports,
         "new_urls_total": sum(item["new_urls"] for item in reports),

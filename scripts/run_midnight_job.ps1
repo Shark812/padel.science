@@ -1,6 +1,8 @@
 $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
+Set-Location $root
+
 $dataDir = Join-Path $root "data"
 $jobDir = Join-Path $dataDir "job-runs"
 $snapshotDir = Join-Path $jobDir "snapshots"

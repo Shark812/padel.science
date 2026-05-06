@@ -94,6 +94,22 @@ CREATE TABLE IF NOT EXISTS app.racket_sources (
     UNIQUE (racket_id, source_portal)
 );
 
+CREATE TABLE IF NOT EXISTS app.racket_reddit_threads (
+    id BIGSERIAL PRIMARY KEY,
+    racket_id BIGINT NOT NULL REFERENCES app.rackets(id) ON DELETE CASCADE,
+    reddit_post_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    upvotes INTEGER NOT NULL DEFAULT 0,
+    comment_count INTEGER NOT NULL DEFAULT 0,
+    thread_created_at TIMESTAMPTZ,
+    thread_url TEXT NOT NULL,
+    subreddit TEXT NOT NULL,
+    search_query TEXT,
+    discovered_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (racket_id, reddit_post_id)
+);
+
 CREATE OR REPLACE FUNCTION app.set_updated_at()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -113,6 +129,12 @@ EXECUTE FUNCTION app.set_updated_at();
 DROP TRIGGER IF EXISTS set_brand_official_domains_updated_at ON app.brand_official_domains;
 CREATE TRIGGER set_brand_official_domains_updated_at
 BEFORE UPDATE ON app.brand_official_domains
+FOR EACH ROW
+EXECUTE FUNCTION app.set_updated_at();
+
+DROP TRIGGER IF EXISTS set_racket_reddit_threads_updated_at ON app.racket_reddit_threads;
+CREATE TRIGGER set_racket_reddit_threads_updated_at
+BEFORE UPDATE ON app.racket_reddit_threads
 FOR EACH ROW
 EXECUTE FUNCTION app.set_updated_at();
 
@@ -186,6 +208,15 @@ ON app.racket_sources(racket_id);
 CREATE INDEX IF NOT EXISTS idx_racket_sources_name_trgm
 ON app.racket_sources
 USING gin (source_name gin_trgm_ops);
+
+CREATE INDEX IF NOT EXISTS idx_racket_reddit_threads_racket_id
+ON app.racket_reddit_threads(racket_id);
+
+CREATE INDEX IF NOT EXISTS idx_racket_reddit_threads_subreddit
+ON app.racket_reddit_threads(subreddit);
+
+CREATE INDEX IF NOT EXISTS idx_racket_reddit_threads_created_at
+ON app.racket_reddit_threads(thread_created_at DESC);
 
 DROP FUNCTION IF EXISTS app.compare_rackets(TEXT[]);
 DROP FUNCTION IF EXISTS app.search_rackets(TEXT, SMALLINT, TEXT, INTEGER, INTEGER);

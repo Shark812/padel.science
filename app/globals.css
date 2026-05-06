@@ -200,6 +200,78 @@ select {
   height: 100%;
   border-radius: inherit;
   background: var(--primary);
+  transition: width 680ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes ripple {
+  from {
+    opacity: 0.55;
+    transform: scale(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+@keyframes sheet-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes compare-bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes compare-bar-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+
+@utility animate-ripple {
+  animation: ripple 650ms ease-out forwards;
+  transform-origin: center;
+}
+
+@utility animate-sheet-up {
+  animation: sheet-up 260ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@utility animate-compare-bar-in {
+  animation: compare-bar-in 260ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@utility animate-compare-bar-out {
+  animation: compare-bar-out 220ms cubic-bezier(0.55, 0, 1, 0.45) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .metric-bar > span {
+    transition: none;
+  }
 }
 
 @layer base {

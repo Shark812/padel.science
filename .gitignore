@@ -51,6 +51,9 @@ data/**/*.tsv
 data/**/*.log
 data/**/*.txt
 
+# Downloaded racket images are local/generated assets for now
+public/racket-images/
+
 # Keep data folders in repo structure if needed
 !data/**/.gitkeep
 

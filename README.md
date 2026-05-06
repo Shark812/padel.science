@@ -61,6 +61,12 @@ Ricostruzione dataset unificato:
 python .\scripts\build_unified_rackets.py
 ```
 
+Download locale delle immagini e riscrittura di `image_url` con path serviti da Next:
+
+```powershell
+python .\scripts\download_racket_images.py
+```
+
 Job notturno manuale:
 
 ```powershell
@@ -78,8 +84,11 @@ powershell -ExecutionPolicy Bypass -File .\scripts\register_midnight_task.ps1
 Gli output vengono salvati in `data/` e non sono tracciati da Git:
 - dataset per singola fonte
 - dataset unificato
+- manifest del download immagini
 - log e report dei job
 - stato incrementale degli URL già visti
+
+Le immagini scaricate vengono salvate in `public/racket-images/` e vengono referenziate nel dataset come `/racket-images/...`, cosi il frontend non dipende dagli URL immagine delle fonti.
 
 ## Database locale
 
