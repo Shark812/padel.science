@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import type { RacketSearchResult } from "@/lib/db";
 import { cn } from "@/lib/utils";
 
@@ -46,7 +47,7 @@ type SearchResultsPanelProps = {
   initialSortValue: string;
 };
 
-type FilterKey = "overall" | "power" | "control" | "maneuverability" | "sweet_spot" | "reliability";
+type FilterKey = "overall" | "power" | "control" | "maneuverability" | "sweet_spot";
 type CompareSelection = {
   id: string;
   canonical_name: string;
@@ -67,7 +68,6 @@ const filterDefs: {
   { key: "control", label: "Control", field: "control_avg", min: 0, max: 10, step: 0.5 },
   { key: "maneuverability", label: "Maneuverability", field: "maneuverability_avg", min: 0, max: 10, step: 0.5 },
   { key: "sweet_spot", label: "Sweet spot", field: "sweet_spot_avg", min: 0, max: 10, step: 0.5 },
-  { key: "reliability", label: "Reliability", min: 1, max: 5, step: 1 },
 ];
 
 function parseMetric(value: string | null) {
@@ -118,13 +118,13 @@ export function SearchResultsPanel({
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [showCompareBar, setShowCompareBar] = useState(false);
   const [isCompareBarClosing, setIsCompareBarClosing] = useState(false);
+  const [showLowReliability, setShowLowReliability] = useState(false);
   const [mins, setMins] = useState<Record<FilterKey, number>>({
     overall: 0,
     power: 0,
     control: 0,
     maneuverability: 0,
     sweet_spot: 0,
-    reliability: 3,
   });
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const recommendedRef = useRef<HTMLDivElement | null>(null);
@@ -224,13 +224,14 @@ export function SearchResultsPanel({
     return rackets
       .filter((racket) => {
         const passesMetrics = filterDefs.every((def) => {
-          if (def.key === "reliability") return racket.reliability_score >= mins.reliability;
           if (!def.field) return true;
           const value = parseMetric(racket[def.field]);
           return value !== null && value >= mins[def.key];
         });
 
-        return passesMetrics && (shape === "all" || racket.shape === shape);
+        const passesReliabilityRule = showLowReliability ? true : racket.source_count > 2;
+
+        return passesMetrics && passesReliabilityRule && (shape === "all" || racket.shape === shape);
       })
       .sort((a, b) => {
         const aMetric = parseMetric(a[activeSort.field]) ?? -1;
@@ -238,14 +239,14 @@ export function SearchResultsPanel({
         if (bMetric !== aMetric) return bMetric - aMetric;
         return (b.year ?? -1) - (a.year ?? -1) || a.canonical_name.localeCompare(b.canonical_name);
       });
-  }, [activeSort.field, mins, rackets, shape]);
+  }, [activeSort.field, mins, rackets, shape, showLowReliability]);
 
   const visibleRackets = filteredAndSorted.slice(0, visibleCount);
   const hasMoreResults = filteredAndSorted.length > visibleCount;
 
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE_RESULTS);
-  }, [query, sortValue, shape, mins]);
+  }, [query, sortValue, shape, mins, showLowReliability]);
 
   useEffect(() => {
     if (!hasMoreResults || !loadMoreRef.current) return;
@@ -291,8 +292,8 @@ export function SearchResultsPanel({
       control: 0,
       maneuverability: 0,
       sweet_spot: 0,
-      reliability: 3,
     });
+    setShowLowReliability(false);
   }
 
   function scrollRecommended(direction: "previous" | "next") {
@@ -321,9 +322,10 @@ export function SearchResultsPanel({
   const activeFiltersCount =
     (shape === "all" ? 0 : 1) +
     filterDefs.reduce((count, def) => {
-      const defaultValue = def.key === "reliability" ? 3 : 0;
+      const defaultValue = 0;
       return count + (mins[def.key] !== defaultValue ? 1 : 0);
-    }, 0);
+    }, 0) +
+    (showLowReliability ? 1 : 0);
 
   function renderFilterControls() {
     return (
@@ -348,7 +350,7 @@ export function SearchResultsPanel({
         <div key={def.key} className="grid gap-2">
           <div className="flex items-center justify-between text-sm">
             <label className="font-bold">{def.label}</label>
-            <span className="font-mono text-xs text-muted-foreground">{mins[def.key].toFixed(def.key === "reliability" ? 0 : 1)}</span>
+            <span className="font-mono text-xs text-muted-foreground">{mins[def.key].toFixed(1)}</span>
           </div>
           <Slider
             min={def.min}
@@ -361,6 +363,17 @@ export function SearchResultsPanel({
           />
         </div>
       ))}
+      <div className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2">
+        <label htmlFor="low-reliability" className="text-sm font-bold">
+          Low reliability
+        </label>
+        <Switch
+          id="low-reliability"
+          checked={showLowReliability}
+          onCheckedChange={setShowLowReliability}
+          aria-label="Toggle low reliability rackets"
+        />
+      </div>
       </>
     );
   }

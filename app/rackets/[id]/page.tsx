@@ -5,8 +5,7 @@ import {
   ArrowRight,
   Bookmark,
   ExternalLink,
-  Heart,
-  Search,
+  Scale,
   ShieldCheck,
   Sparkles,
   Target,
@@ -82,13 +81,8 @@ export default async function RacketPage({ params }: RacketPageProps) {
 
         <section className="grid gap-5 lg:grid-cols-[0.82fr_1.18fr]">
           <div className="surface-card rounded-2xl p-5">
-            <div className="mb-3 flex items-center justify-between">
-              {racket.year ? <Badge className="rounded-lg bg-secondary text-primary">{racket.year}</Badge> : <span />}
-              <button type="button" className="flex size-11 items-center justify-center rounded-full border border-border bg-card transition hover:border-primary/40" aria-label="Zoom image">
-                <Search className="size-5" strokeWidth={1.9} />
-              </button>
-            </div>
-            <div className="flex min-h-[430px] items-center justify-center rounded-xl bg-muted/60 p-8">
+            <div className="mb-3">{racket.year ? <Badge className="rounded-lg bg-secondary text-primary">{racket.year}</Badge> : null}</div>
+            <div className="flex min-h-[430px] items-center justify-center rounded-xl p-8">
               {racket.image_url ? (
                 <img src={racket.image_url} alt={racket.canonical_name} className="max-h-[420px] w-full object-contain drop-shadow-2xl" />
               ) : (
@@ -98,16 +92,13 @@ export default async function RacketPage({ params }: RacketPageProps) {
           </div>
 
           <div className="surface-card rounded-2xl p-7">
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-4">
               <div>
                 <p className="text-lg font-extrabold uppercase tracking-wide text-foreground">{racket.brand_name}</p>
                 <h1 className="mt-1 max-w-2xl text-balance font-heading text-4xl font-bold leading-tight tracking-tight text-foreground md:text-5xl">
                   {racket.canonical_name}
                 </h1>
               </div>
-              <button type="button" className="flex size-12 items-center justify-center rounded-full border border-border bg-card transition hover:border-primary/40" aria-label="Save racket">
-                <Heart className="size-5" strokeWidth={1.9} />
-              </button>
             </div>
 
             <div className="mt-5 flex flex-wrap gap-2">
@@ -138,16 +129,12 @@ export default async function RacketPage({ params }: RacketPageProps) {
               {shortDescription}
             </p>
 
-            <div className="mt-7 grid gap-3 md:grid-cols-2">
-              <Button asChild className="h-14 gap-2 rounded-xl bg-primary text-base font-bold shadow-lg shadow-primary/20">
+            <div className="mt-7 flex justify-center">
+              <Button asChild className="h-14 gap-2 rounded-xl bg-primary px-8 text-base font-bold shadow-lg shadow-primary/20">
                 <Link href={`/compare?ids=${racket.unified_id}`}>
-                  <UserRound className="size-5" />
+                  <Scale className="size-5" />
                   Add to Compare
                 </Link>
-              </Button>
-              <Button variant="outline" className="h-14 gap-2 rounded-xl text-base font-bold">
-                <Bookmark className="size-5" />
-                Save
               </Button>
             </div>
 
