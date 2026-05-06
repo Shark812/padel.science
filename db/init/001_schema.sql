@@ -2,6 +2,11 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 CREATE SCHEMA IF NOT EXISTS app;
 
+DROP FUNCTION IF EXISTS app.compare_rackets(TEXT[]);
+DROP FUNCTION IF EXISTS app.search_rackets(TEXT, SMALLINT, TEXT, INTEGER, INTEGER);
+DROP FUNCTION IF EXISTS app.get_racket_detail(TEXT);
+DROP VIEW IF EXISTS app.rackets_enriched;
+
 CREATE TABLE IF NOT EXISTS app.brands (
     id BIGSERIAL PRIMARY KEY,
     slug TEXT NOT NULL UNIQUE,
@@ -37,6 +42,10 @@ CREATE TABLE IF NOT EXISTS app.rackets (
     source_portals TEXT[] NOT NULL DEFAULT '{}',
     source_urls_json JSONB NOT NULL DEFAULT '{}'::jsonb,
     aliases_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+    short_description TEXT,
+    long_description TEXT,
+    description_generated_at TIMESTAMPTZ,
+    description_model TEXT,
     shape TEXT,
     balance TEXT,
     surface TEXT,
@@ -79,9 +88,47 @@ ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS frame_material TEXT;
 ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS match_confidence NUMERIC(5,3);
 ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS needs_review BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS review_reasons_json JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE app.rackets DROP COLUMN IF EXISTS description;
+ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS short_description TEXT;
+ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS long_description TEXT;
+ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS description_generated_at TIMESTAMPTZ;
+ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS description_model TEXT;
 ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS image_source_recommended TEXT;
 ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS image_url TEXT;
 ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS image_source_portal TEXT;
+
+CREATE TABLE IF NOT EXISTS app.source_racket_descriptions (
+    id BIGSERIAL PRIMARY KEY,
+    source_portal TEXT NOT NULL,
+    source_url TEXT NOT NULL,
+    source_name TEXT,
+    source_slug TEXT,
+    description TEXT NOT NULL,
+    description_char_count INTEGER NOT NULL,
+    description_word_count INTEGER NOT NULL,
+    raw_record_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+    scraped_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (source_portal, source_url)
+);
+
+CREATE TABLE IF NOT EXISTS app.racket_unified_descriptions (
+    id BIGSERIAL PRIMARY KEY,
+    unified_id TEXT NOT NULL UNIQUE,
+    short_description TEXT,
+    long_description TEXT,
+    model TEXT,
+    source_descriptions_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+    prompt_version TEXT,
+    generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE app.racket_unified_descriptions DROP COLUMN IF EXISTS description;
+ALTER TABLE app.racket_unified_descriptions ADD COLUMN IF NOT EXISTS short_description TEXT;
+ALTER TABLE app.racket_unified_descriptions ADD COLUMN IF NOT EXISTS long_description TEXT;
 
 CREATE TABLE IF NOT EXISTS app.racket_sources (
     id BIGSERIAL PRIMARY KEY,
@@ -89,10 +136,13 @@ CREATE TABLE IF NOT EXISTS app.racket_sources (
     source_portal TEXT NOT NULL,
     source_url TEXT NOT NULL,
     source_name TEXT,
+    source_description TEXT,
     is_present BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (racket_id, source_portal)
 );
+
+ALTER TABLE app.racket_sources ADD COLUMN IF NOT EXISTS source_description TEXT;
 
 CREATE TABLE IF NOT EXISTS app.racket_reddit_threads (
     id BIGSERIAL PRIMARY KEY,
@@ -129,6 +179,18 @@ EXECUTE FUNCTION app.set_updated_at();
 DROP TRIGGER IF EXISTS set_brand_official_domains_updated_at ON app.brand_official_domains;
 CREATE TRIGGER set_brand_official_domains_updated_at
 BEFORE UPDATE ON app.brand_official_domains
+FOR EACH ROW
+EXECUTE FUNCTION app.set_updated_at();
+
+DROP TRIGGER IF EXISTS set_source_racket_descriptions_updated_at ON app.source_racket_descriptions;
+CREATE TRIGGER set_source_racket_descriptions_updated_at
+BEFORE UPDATE ON app.source_racket_descriptions
+FOR EACH ROW
+EXECUTE FUNCTION app.set_updated_at();
+
+DROP TRIGGER IF EXISTS set_racket_unified_descriptions_updated_at ON app.racket_unified_descriptions;
+CREATE TRIGGER set_racket_unified_descriptions_updated_at
+BEFORE UPDATE ON app.racket_unified_descriptions
 FOR EACH ROW
 EXECUTE FUNCTION app.set_updated_at();
 
@@ -192,6 +254,10 @@ CREATE INDEX IF NOT EXISTS idx_rackets_aliases_json_gin
 ON app.rackets
 USING gin (aliases_json);
 
+CREATE INDEX IF NOT EXISTS idx_rackets_has_description
+ON app.rackets(id)
+WHERE short_description IS NOT NULL OR long_description IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS idx_rackets_image_source_portal
 ON app.rackets(image_source_portal);
 
@@ -208,6 +274,23 @@ ON app.racket_sources(racket_id);
 CREATE INDEX IF NOT EXISTS idx_racket_sources_name_trgm
 ON app.racket_sources
 USING gin (source_name gin_trgm_ops);
+
+CREATE INDEX IF NOT EXISTS idx_racket_sources_has_description
+ON app.racket_sources(racket_id)
+WHERE source_description IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_source_racket_descriptions_portal
+ON app.source_racket_descriptions(source_portal);
+
+CREATE INDEX IF NOT EXISTS idx_source_racket_descriptions_url
+ON app.source_racket_descriptions(source_url);
+
+CREATE INDEX IF NOT EXISTS idx_source_racket_descriptions_name_trgm
+ON app.source_racket_descriptions
+USING gin (source_name gin_trgm_ops);
+
+CREATE INDEX IF NOT EXISTS idx_racket_unified_descriptions_unified_id
+ON app.racket_unified_descriptions(unified_id);
 
 CREATE INDEX IF NOT EXISTS idx_racket_reddit_threads_racket_id
 ON app.racket_reddit_threads(racket_id);
@@ -240,6 +323,10 @@ SELECT
     r.source_portals,
     r.source_urls_json,
     r.aliases_json,
+    r.short_description,
+    r.long_description,
+    r.description_generated_at,
+    r.description_model,
     r.shape,
     r.balance,
     r.surface,
@@ -290,6 +377,8 @@ RETURNS TABLE (
     match_confidence NUMERIC(5,3),
     needs_review BOOLEAN,
     review_reasons_json JSONB,
+    short_description TEXT,
+    long_description TEXT,
     image_url TEXT,
     overall_rating_avg NUMERIC(6,3),
     similarity_score REAL
@@ -308,6 +397,8 @@ AS $$
         re.match_confidence,
         re.needs_review,
         re.review_reasons_json,
+        re.short_description,
+        re.long_description,
         re.image_url,
         re.overall_rating_avg,
         CASE
@@ -349,6 +440,8 @@ RETURNS TABLE (
     match_confidence NUMERIC(5,3),
     needs_review BOOLEAN,
     review_reasons_json JSONB,
+    short_description TEXT,
+    long_description TEXT,
     image_url TEXT,
     image_source_portal TEXT,
     shape TEXT,
@@ -390,6 +483,8 @@ AS $$
         re.match_confidence,
         re.needs_review,
         re.review_reasons_json,
+        re.short_description,
+        re.long_description,
         re.image_url,
         re.image_source_portal,
         re.shape,
@@ -422,6 +517,7 @@ AS $$
                         'source_portal', rs.source_portal,
                         'source_url', rs.source_url,
                         'source_name', rs.source_name,
+                        'source_description', rs.source_description,
                         'is_present', rs.is_present
                     )
                     ORDER BY rs.source_portal

@@ -97,15 +97,6 @@ export default async function RacketPage({ params }: RacketPageProps) {
                 <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Image not available</span>
               )}
             </div>
-            <div className="mt-5 grid grid-cols-[auto_1fr_1fr_1fr_auto] items-center gap-3">
-              <button type="button" className="text-2xl text-muted-foreground" aria-label="Previous image">&lt;</button>
-              {[racket.image_url, racket.image_url, racket.image_url].map((image, index) => (
-                <div key={`thumb-${index}`} className={`flex h-20 items-center justify-center rounded-xl border bg-card p-2 ${index === 0 ? "border-primary" : "border-border"}`}>
-                  {image ? <img src={image} alt={`${racket.canonical_name} thumbnail ${index + 1}`} className="max-h-16 object-contain" /> : null}
-                </div>
-              ))}
-              <button type="button" className="text-2xl text-muted-foreground" aria-label="Next image">&gt;</button>
-            </div>
           </div>
 
           <div className="surface-card rounded-2xl p-7">

@@ -29,6 +29,8 @@ export type RacketSearchResult = {
   match_confidence: string | null;
   needs_review: boolean;
   review_reasons_json: unknown;
+  short_description: string | null;
+  long_description: string | null;
   image_url: string | null;
   overall_rating_avg: string | null;
   power_avg: string | null;
@@ -70,6 +72,7 @@ export type RacketDetail = RacketSearchResult & {
     source_portal: string;
     source_url: string;
     source_name: string | null;
+    source_description: string | null;
     is_present: boolean;
   }>;
 };
@@ -98,6 +101,8 @@ export async function searchRackets(query: string | null, limit: number | null =
         re.match_confidence,
         re.needs_review,
         re.review_reasons_json,
+        re.short_description,
+        re.long_description,
         re.image_url,
         re.overall_rating_avg,
         re.power_avg,

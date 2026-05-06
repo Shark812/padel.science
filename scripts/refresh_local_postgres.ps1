@@ -21,6 +21,12 @@ if ($LASTEXITCODE -ne 0) {
     throw "Failed to apply PostgreSQL schema."
 }
 
+Write-Output "Loading source racket descriptions."
+node (Join-Path $root "scripts\load_source_descriptions.js")
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to load source racket descriptions."
+}
+
 cmd /c "docker exec -i padel-postgres psql -U padel -d padel -f /workspace/db/sql/refresh_unified.sql"
 if ($LASTEXITCODE -ne 0) {
     throw "Failed to refresh PostgreSQL from unified dataset."

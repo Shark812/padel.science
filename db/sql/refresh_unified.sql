@@ -8,6 +8,13 @@ ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS frame_material TEXT;
 ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS match_confidence NUMERIC(5,3);
 ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS needs_review BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS review_reasons_json JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS short_description TEXT;
+ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS long_description TEXT;
+ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS description_generated_at TIMESTAMPTZ;
+ALTER TABLE app.rackets ADD COLUMN IF NOT EXISTS description_model TEXT;
+ALTER TABLE app.racket_sources ADD COLUMN IF NOT EXISTS source_description TEXT;
+ALTER TABLE app.racket_unified_descriptions ADD COLUMN IF NOT EXISTS short_description TEXT;
+ALTER TABLE app.racket_unified_descriptions ADD COLUMN IF NOT EXISTS long_description TEXT;
 
 TRUNCATE TABLE app.racket_sources, app.rackets, app.brands RESTART IDENTITY CASCADE;
 
@@ -94,6 +101,10 @@ INSERT INTO app.rackets (
     source_portals,
     source_urls_json,
     aliases_json,
+    short_description,
+    long_description,
+    description_generated_at,
+    description_model,
     shape,
     balance,
     surface,
@@ -139,96 +150,10 @@ SELECT
     END,
     COALESCE(NULLIF(s.source_urls_json, '')::JSONB, '{}'::JSONB),
     COALESCE(NULLIF(s.aliases_json, '')::JSONB, '[]'::JSONB),
-    NULLIF(s.shape, ''),
-    NULLIF(s.balance, ''),
-    NULLIF(s.surface, ''),
-    NULLIF(s.level, ''),
-    NULLIF(s.feel, ''),
-    NULLIF(s.weight_raw, ''),
-    NULLIF(s.core_material, ''),
-    NULLIF(s.face_material, ''),
-    NULLIF(s.frame_material, ''),
-    NULLIF(s.image_source_recommended, ''),
-    NULLIF(s.image_url, ''),
-    NULLIF(s.image_source_portal, ''),
-    NULLIF(s.overall_rating_avg, '')::NUMERIC(6,3),
-    NULLIF(s.power_avg, '')::NUMERIC(6,3),
-    NULLIF(s.control_avg, '')::NUMERIC(6,3),
-    NULLIF(s.comfort_avg, '')::NUMERIC(6,3),
-    NULLIF(s.spin_avg, '')::NUMERIC(6,3),
-    NULLIF(s.forgiveness_avg, '')::NUMERIC(6,3),
-    NULLIF(s.maneuverability_avg, '')::NUMERIC(6,3),
-    NULLIF(s.low_speed_avg, '')::NUMERIC(6,3),
-    NULLIF(s.rebound_avg, '')::NUMERIC(6,3),
-    NULLIF(s.sweet_spot_avg, '')::NUMERIC(6,3),
-    NULLIF(s.ball_output_avg, '')::NUMERIC(6,3),
-    NULLIF(s.effect_avg, '')::NUMERIC(6,3),
-    NULLIF(s.tolerance_avg, '')::NUMERIC(6,3),
-    NULLIF(s.total_avg, '')::NUMERIC(6,3),
-    NOW()
-FROM staging_unified s
-JOIN app.brands b
-  ON b.slug = LOWER(TRIM(s.brand));
-
-INSERT INTO app.rackets (
-    unified_id,
-    canonical_name,
-    brand_id,
-    year,
-    slug_canonical,
-    source_count,
-    reliability_score,
-    match_confidence,
-    needs_review,
-    review_reasons_json,
-    source_portals,
-    source_urls_json,
-    aliases_json,
-    shape,
-    balance,
-    surface,
-    level,
-    feel,
-    weight_raw,
-    core_material,
-    face_material,
-    frame_material,
-    image_source_recommended,
-    image_url,
-    image_source_portal,
-    overall_rating_avg,
-    power_avg,
-    control_avg,
-    comfort_avg,
-    spin_avg,
-    forgiveness_avg,
-    maneuverability_avg,
-    low_speed_avg,
-    rebound_avg,
-    sweet_spot_avg,
-    ball_output_avg,
-    effect_avg,
-    tolerance_avg,
-    total_avg,
-    updated_at
-)
-SELECT
-    s.unified_id,
-    s.canonical_name,
-    b.id,
-    NULLIF(s.year, '')::INTEGER,
-    NULLIF(s.slug_canonical, ''),
-    NULLIF(s.source_count, '')::SMALLINT,
-    NULLIF(s.reliability_score, '')::SMALLINT,
-    NULLIF(s.match_confidence, '')::NUMERIC(5,3),
-    COALESCE(NULLIF(s.needs_review, ''), '0') = '1',
-    COALESCE(NULLIF(s.review_reasons_json, '')::JSONB, '[]'::JSONB),
-    CASE
-        WHEN NULLIF(s.source_portals, '') IS NULL THEN ARRAY[]::TEXT[]
-        ELSE string_to_array(s.source_portals, '|')
-    END,
-    COALESCE(NULLIF(s.source_urls_json, '')::JSONB, '{}'::JSONB),
-    COALESCE(NULLIF(s.aliases_json, '')::JSONB, '[]'::JSONB),
+    ud.short_description,
+    ud.long_description,
+    ud.generated_at,
+    ud.model,
     NULLIF(s.shape, ''),
     NULLIF(s.balance, ''),
     NULLIF(s.surface, ''),
@@ -259,12 +184,127 @@ SELECT
 FROM staging_unified s
 JOIN app.brands b
   ON b.slug = LOWER(TRIM(s.brand))
+LEFT JOIN app.racket_unified_descriptions ud
+  ON ud.unified_id = s.unified_id;
+
+INSERT INTO app.rackets (
+    unified_id,
+    canonical_name,
+    brand_id,
+    year,
+    slug_canonical,
+    source_count,
+    reliability_score,
+    match_confidence,
+    needs_review,
+    review_reasons_json,
+    source_portals,
+    source_urls_json,
+    aliases_json,
+    short_description,
+    long_description,
+    description_generated_at,
+    description_model,
+    shape,
+    balance,
+    surface,
+    level,
+    feel,
+    weight_raw,
+    core_material,
+    face_material,
+    frame_material,
+    image_source_recommended,
+    image_url,
+    image_source_portal,
+    overall_rating_avg,
+    power_avg,
+    control_avg,
+    comfort_avg,
+    spin_avg,
+    forgiveness_avg,
+    maneuverability_avg,
+    low_speed_avg,
+    rebound_avg,
+    sweet_spot_avg,
+    ball_output_avg,
+    effect_avg,
+    tolerance_avg,
+    total_avg,
+    updated_at
+)
+SELECT
+    s.unified_id,
+    s.canonical_name,
+    b.id,
+    NULLIF(s.year, '')::INTEGER,
+    NULLIF(s.slug_canonical, ''),
+    NULLIF(s.source_count, '')::SMALLINT,
+    NULLIF(s.reliability_score, '')::SMALLINT,
+    NULLIF(s.match_confidence, '')::NUMERIC(5,3),
+    COALESCE(NULLIF(s.needs_review, ''), '0') = '1',
+    COALESCE(NULLIF(s.review_reasons_json, '')::JSONB, '[]'::JSONB),
+    CASE
+        WHEN NULLIF(s.source_portals, '') IS NULL THEN ARRAY[]::TEXT[]
+        ELSE string_to_array(s.source_portals, '|')
+    END,
+    COALESCE(NULLIF(s.source_urls_json, '')::JSONB, '{}'::JSONB),
+    COALESCE(NULLIF(s.aliases_json, '')::JSONB, '[]'::JSONB),
+    ud.short_description,
+    ud.long_description,
+    ud.generated_at,
+    ud.model,
+    NULLIF(s.shape, ''),
+    NULLIF(s.balance, ''),
+    NULLIF(s.surface, ''),
+    NULLIF(s.level, ''),
+    NULLIF(s.feel, ''),
+    NULLIF(s.weight_raw, ''),
+    NULLIF(s.core_material, ''),
+    NULLIF(s.face_material, ''),
+    NULLIF(s.frame_material, ''),
+    NULLIF(s.image_source_recommended, ''),
+    NULLIF(s.image_url, ''),
+    NULLIF(s.image_source_portal, ''),
+    NULLIF(s.overall_rating_avg, '')::NUMERIC(6,3),
+    NULLIF(s.power_avg, '')::NUMERIC(6,3),
+    NULLIF(s.control_avg, '')::NUMERIC(6,3),
+    NULLIF(s.comfort_avg, '')::NUMERIC(6,3),
+    NULLIF(s.spin_avg, '')::NUMERIC(6,3),
+    NULLIF(s.forgiveness_avg, '')::NUMERIC(6,3),
+    NULLIF(s.maneuverability_avg, '')::NUMERIC(6,3),
+    NULLIF(s.low_speed_avg, '')::NUMERIC(6,3),
+    NULLIF(s.rebound_avg, '')::NUMERIC(6,3),
+    NULLIF(s.sweet_spot_avg, '')::NUMERIC(6,3),
+    NULLIF(s.ball_output_avg, '')::NUMERIC(6,3),
+    NULLIF(s.effect_avg, '')::NUMERIC(6,3),
+    NULLIF(s.tolerance_avg, '')::NUMERIC(6,3),
+    NULLIF(s.total_avg, '')::NUMERIC(6,3),
+    NOW()
+FROM staging_unified s
+JOIN app.brands b
+  ON b.slug = LOWER(TRIM(s.brand))
+LEFT JOIN app.racket_unified_descriptions ud
+  ON ud.unified_id = s.unified_id
 LEFT JOIN app.rackets r
   ON r.unified_id = s.unified_id
 WHERE r.id IS NULL;
 
-INSERT INTO app.racket_sources (racket_id, source_portal, source_url, source_name, is_present)
-SELECT r.id, src.source_portal, src.source_url, src.source_name, src.is_present
+INSERT INTO app.racket_sources (
+    racket_id,
+    source_portal,
+    source_url,
+    source_name,
+    source_description,
+    is_present
+)
+SELECT
+    r.id,
+    src.source_portal,
+    src.source_url,
+    src.source_name,
+    sd.description,
+    src.is_present
 FROM staging_unified s
 JOIN app.rackets r
   ON r.unified_id = s.unified_id
@@ -276,6 +316,9 @@ CROSS JOIN LATERAL (
         ('padelreference', s.padelreference_url, s.padelreference_name, COALESCE(NULLIF(s.has_padelreference, ''), '0') = '1'),
         ('extreme-tennis', s.extreme_tennis_url, s.extreme_tennis_name, COALESCE(NULLIF(s.has_extreme_tennis, ''), '0') = '1')
 ) AS src(source_portal, source_url, source_name, is_present)
+LEFT JOIN app.source_racket_descriptions sd
+  ON sd.source_portal = src.source_portal
+ AND sd.source_url = src.source_url
 WHERE src.is_present
   AND NULLIF(src.source_url, '') IS NOT NULL;
 
