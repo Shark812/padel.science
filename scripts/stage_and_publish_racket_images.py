@@ -6,6 +6,7 @@ import csv
 import hashlib
 import json
 import mimetypes
+import re
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -68,6 +69,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model", default="isnet-general-use")
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--keep-temp", action="store_true")
+    parser.add_argument("--plan-only", action="store_true", help="Only compute reuse/download plan, do not download or update files.")
     return parser.parse_args()
 
 
@@ -103,8 +105,6 @@ def save_cache(cache_path: Path, mapping: dict[str, str]) -> None:
 
 
 def slugify(value: str, fallback: str) -> str:
-    import re
-
     slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
     slug = re.sub(r"-{2,}", "-", slug)
     return (slug or fallback)[:80].strip("-") or fallback
@@ -141,9 +141,22 @@ def local_file_exists_for_url(local_url: str, public_path: str, public_dir: Path
     return (public_dir / filename).exists()
 
 
+def build_local_hash_index(public_dir: Path, public_path: str) -> dict[str, str]:
+    index: dict[str, str] = {}
+    pattern = re.compile(r"-([0-9a-f]{10})\.webp$", re.IGNORECASE)
+    for path in public_dir.glob("*.webp"):
+        match = pattern.search(path.name)
+        if not match:
+            continue
+        hash_value = match.group(1).lower()
+        index.setdefault(hash_value, f"{public_path.rstrip('/')}/{path.name}")
+    return index
+
+
 def build_download_items(
     rows: list[dict[str, Any]],
     cache: dict[str, str],
+    hash_index: dict[str, str],
     public_path: str,
     public_dir: Path,
     limit: int | None,
@@ -169,6 +182,11 @@ def build_download_items(
         unified_id = str(row.get("unified_id") or f"row-{index + 1}")
         canonical_name = str(row.get("canonical_name") or unified_id)
         url_hash = hashlib.sha1(source_url.encode("utf-8")).hexdigest()[:10]
+        hashed_local_url = hash_index.get(url_hash)
+        if hashed_local_url and local_file_exists_for_url(hashed_local_url, public_path, public_dir):
+            row_to_cached_local_url[index] = hashed_local_url
+            source_to_local_reused[source_url] = hashed_local_url
+            continue
         file_stem = f"{slugify(unified_id, f'row-{index + 1}')}-{slugify(canonical_name, unified_id)}-{url_hash}"
         existing_local_url = f"{public_path.rstrip('/')}/{file_stem}.webp"
         if local_file_exists_for_url(existing_local_url, public_path, public_dir):
@@ -340,13 +358,48 @@ def main() -> None:
         raise ValueError(f"CSV does not include image_url column: {csv_path}")
 
     cache = load_cache(cache_path)
+    hash_index = build_local_hash_index(public_dir=public_dir, public_path=public_path)
     items, row_to_cached_local_url, remote_rows_count, source_to_local_reused = build_download_items(
         rows=rows,
         cache=cache,
+        hash_index=hash_index,
         public_path=public_path,
         public_dir=public_dir,
         limit=args.limit,
     )
+    if args.plan_only:
+        summary = {
+            "csv_path": str(csv_path),
+            "json_path": str(json_path),
+            "public_dir": str(public_dir),
+            "temp_root": str(temp_root),
+            "remote_rows_seen": remote_rows_count,
+            "cached_rows_reused": len(row_to_cached_local_url),
+            "requested_downloads": len(items),
+            "downloaded": 0,
+            "download_error_count": 0,
+            "alpha_passthrough": 0,
+            "bg_removed": 0,
+            "published": 0,
+            "publish_error_count": 0,
+            "updated_dataset_rows": 0,
+            "cache_path": str(cache_path),
+            "cache_size": len(cache),
+            "hash_index_size": len(hash_index),
+            "quality": args.quality,
+            "alpha_quality": args.alpha_quality,
+            "method": args.method,
+            "lossless": args.lossless,
+            "model": args.model,
+            "download_errors": [],
+            "publish_errors": [],
+            "plan_only": True,
+        }
+        summary_path.parent.mkdir(parents=True, exist_ok=True)
+        summary_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
+        return
+
     raw_dir = temp_root / "raw"
     if temp_root.exists():
         shutil.rmtree(temp_root)
@@ -413,6 +466,7 @@ def main() -> None:
         "updated_dataset_rows": updated_rows,
         "cache_path": str(cache_path),
         "cache_size": len(refreshed_cache),
+        "hash_index_size": len(hash_index),
         "quality": args.quality,
         "alpha_quality": args.alpha_quality,
         "method": args.method,

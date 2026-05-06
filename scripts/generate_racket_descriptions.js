@@ -120,6 +120,15 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function secondsSince(startedAt) {
+  return Number(((Date.now() - startedAt) / 1000).toFixed(2));
+}
+
+function average(values) {
+  if (values.length === 0) return null;
+  return Number((values.reduce((total, value) => total + value, 0) / values.length).toFixed(2));
+}
+
 function cleanText(value) {
   if (value === null || value === undefined) return null;
   const text = String(value).replace(/\s+/g, " ").trim();
@@ -410,6 +419,7 @@ async function processRacket({
   total,
   dryRun,
 }) {
+  const startedAt = Date.now();
   const client = await pool.connect();
   try {
     const sources = await fetchSources(client, racket.id);
@@ -424,7 +434,12 @@ async function processRacket({
 
     const descriptions = await callOpenRouter({ apiKey, model, prompt, userInput });
     await saveDescriptions(client, { racket, sources, model, descriptions });
-    return { saved: true };
+    const duration_seconds = secondsSince(startedAt);
+    console.log(`  -> saved ${racket.unified_id} in ${duration_seconds}s`);
+    return { saved: true, duration_seconds };
+  } catch (error) {
+    console.error(`  -> failed ${racket.unified_id} after ${secondsSince(startedAt)}s`);
+    throw error;
   } finally {
     client.release();
   }
@@ -463,7 +478,12 @@ async function main() {
     processed: 0,
     saved: 0,
     failed: 0,
+    duration_seconds: 0,
+    average_success_seconds: null,
+    throughput_per_minute: null,
   };
+  const runStartedAt = Date.now();
+  const successDurations = [];
 
   try {
     const rackets = await fetchPendingRackets(client, args);
@@ -492,7 +512,12 @@ async function main() {
           total: rackets.length,
           dryRun: args.dryRun,
         });
-        if (result.saved) summary.saved += 1;
+        if (result.saved) {
+          summary.saved += 1;
+          if (result.duration_seconds !== undefined) {
+            successDurations.push(result.duration_seconds);
+          }
+        }
       } catch (error) {
         summary.failed += 1;
         console.error(`  ! failed ${racket.unified_id}: ${error.message}`);
@@ -508,6 +533,13 @@ async function main() {
     client.release();
     await pool.end();
   }
+
+  summary.duration_seconds = secondsSince(runStartedAt);
+  summary.average_success_seconds = average(successDurations);
+  summary.throughput_per_minute =
+    summary.duration_seconds > 0
+      ? Number(((summary.saved / summary.duration_seconds) * 60).toFixed(2))
+      : null;
 
   console.log(JSON.stringify(summary, null, 2));
   if (summary.failed > 0) process.exitCode = 1;

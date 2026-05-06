@@ -4,7 +4,6 @@ import {
   ArrowLeft,
   ArrowRight,
   Bookmark,
-  CheckCircle2,
   ExternalLink,
   Heart,
   Search,
@@ -62,14 +61,13 @@ export default async function RacketPage({ params }: RacketPageProps) {
     { label: "Maneuverability", value: toScore(racket.maneuverability_avg), icon: ArrowRight },
     { label: "Sweet spot", value: toScore(racket.sweet_spot_avg), icon: Sparkles },
   ];
-  const profileStats = [
-    ...stats,
-    { label: "Comfort", value: toScore(racket.comfort_avg), icon: CheckCircle2 },
-  ];
+  const profileStats = stats;
   const overall = toScore(racket.overall_rating_avg);
   const moreFromBrand = (await searchRackets(racket.brand_name))
     .filter((item) => item.unified_id !== racket.unified_id && item.brand_name === racket.brand_name)
     .slice(0, 3);
+  const shortDescription = racket.short_description?.trim() || "COMING SOON";
+  const longDescription = racket.long_description?.trim() || "COMING SOON";
 
   return (
     <main className="min-h-[100dvh] bg-background py-6">
@@ -137,9 +135,7 @@ export default async function RacketPage({ params }: RacketPageProps) {
             </div>
 
             <p className="mt-6 max-w-3xl text-base leading-7 text-foreground/82">
-              The {racket.canonical_name} is profiled from unified public sources and normalized
-              across the core padel metrics. It is best suited to players who want a clear view of
-              performance tradeoffs before comparing other rackets.
+              {shortDescription}
             </p>
 
             <div className="mt-7 grid gap-3 md:grid-cols-2">
@@ -214,21 +210,9 @@ export default async function RacketPage({ params }: RacketPageProps) {
           <div className="surface-card rounded-2xl p-6">
             <h2 className="flex items-center gap-2 text-xl font-extrabold tracking-tight">
               <Sparkles className="size-5 text-primary" />
-              At a glance
+              Deep analysis
             </h2>
-            <div className="mt-5 grid gap-4">
-              {[
-                `${racket.shape ?? "Balanced"} shape with ${racket.balance ?? "documented"} balance characteristics.`,
-                `${metricText(stats[0].value)} power score and ${metricText(stats[1].value)} control score for fast comparison.`,
-                `${racket.source_count} source${racket.source_count === 1 ? "" : "s"} contribute to this unified profile.`,
-                `${racket.level ?? "Competitive"} player level based on source metadata.`,
-              ].map((item) => (
-                <p key={item} className="flex gap-3 text-sm leading-6">
-                  <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-primary" />
-                  {item}
-                </p>
-              ))}
-            </div>
+            <p className="mt-5 text-sm leading-7 text-foreground/82">{longDescription}</p>
           </div>
 
           <div className="surface-card rounded-2xl p-6">

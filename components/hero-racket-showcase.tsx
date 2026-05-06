@@ -38,7 +38,7 @@ export function HeroRacketShowcase({ racket }: HeroRacketShowcaseProps) {
           <Link
             href={`/rackets/${heroRacket.unified_id}`}
             aria-label={`Open details for ${heroRacket.canonical_name}`}
-            className="absolute left-1/2 top-0 h-60 w-44 -translate-x-1/2 rotate-[12deg]"
+            className="hero-racket-swing absolute left-1/2 top-0 h-60 w-44 -translate-x-1/2 rotate-[12deg] [--hero-racket-rotate:12deg]"
           >
             <img
               src={heroRacket.image_url}
@@ -71,7 +71,7 @@ export function HeroRacketShowcase({ racket }: HeroRacketShowcaseProps) {
           <Link
             href={`/rackets/${heroRacket.unified_id}`}
             aria-label={`Open details for ${heroRacket.canonical_name}`}
-            className="absolute right-[18%] top-[-8px] h-[430px] w-[310px] rotate-[15deg]"
+            className="hero-racket-swing absolute right-[18%] top-[-8px] h-[430px] w-[310px] rotate-[15deg] [--hero-racket-rotate:15deg]"
           >
             <img
               src={heroRacket.image_url}

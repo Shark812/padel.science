@@ -117,8 +117,11 @@ export async function searchRackets(query: string | null, limit: number | null =
       FROM app.rackets_enriched re
       WHERE (
         COALESCE(NULLIF(TRIM($1), ''), '') = ''
-        OR re.canonical_name ILIKE '%' || $1 || '%'
-        OR re.brand_name ILIKE '%' || $1 || '%'
+        OR NOT EXISTS (
+          SELECT 1
+          FROM unnest(regexp_split_to_array(TRIM($1), '\\s+')) AS term
+          WHERE concat_ws(' ', re.brand_name, re.canonical_name, re.year::text) NOT ILIKE '%' || term || '%'
+        )
       )
       ORDER BY
         re.reliability_score DESC,
@@ -141,7 +144,9 @@ export async function getRandomHeroRacket() {
         re.image_url,
         re.overall_rating_avg
       FROM app.rackets_enriched re
-      WHERE re.image_url IS NOT NULL AND TRIM(re.image_url) <> ''
+      WHERE re.image_url IS NOT NULL
+        AND TRIM(re.image_url) <> ''
+        AND re.source_count >= 5
       ORDER BY random()
       LIMIT 1
     `,

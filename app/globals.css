@@ -28,6 +28,8 @@
   --chart-3: oklch(0.57 0.095 170);
   --chart-4: oklch(0.75 0.12 125);
   --chart-5: oklch(0.36 0.08 154);
+  --compare-chart-1: oklch(0.52 0.14 154);
+  --compare-chart-2: oklch(0.84 0.176 91.2);
   --radius: 0.75rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.141 0.005 285.823);
@@ -74,8 +76,8 @@ select {
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.274 0.006 286.033);
   --muted-foreground: oklch(0.705 0.015 286.067);
-  --accent: oklch(0.45 0.085 224.283);
-  --accent-foreground: oklch(0.984 0.019 200.873);
+  --accent: oklch(0.84 0.176 91.2);
+  --accent-foreground: oklch(0.16 0.055 153);
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
@@ -85,6 +87,8 @@ select {
   --chart-3: oklch(0.596 0.145 163.225);
   --chart-4: oklch(0.508 0.118 165.612);
   --chart-5: oklch(0.432 0.095 166.913);
+  --compare-chart-1: oklch(0.73 0.14 190);
+  --compare-chart-2: oklch(0.84 0.176 91.2);
   --sidebar: oklch(0.21 0.006 285.885);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.715 0.143 215.221);
@@ -183,6 +187,29 @@ select {
   filter: drop-shadow(0 34px 42px color-mix(in oklab, var(--primary) 30%, transparent));
 }
 
+.hero-racket-swing {
+  transform-origin: 50% 88%;
+  animation: hero-racket-swing 980ms cubic-bezier(0.22, 1, 0.36, 1) 220ms both;
+}
+
+@keyframes hero-racket-swing {
+  0% {
+    transform: translateX(var(--tw-translate-x, 0)) rotate(var(--hero-racket-rotate));
+  }
+
+  34% {
+    transform: translateX(var(--tw-translate-x, 0)) translateY(-10px) rotate(calc(var(--hero-racket-rotate) - 7deg));
+  }
+
+  64% {
+    transform: translateX(var(--tw-translate-x, 0)) translateY(4px) rotate(calc(var(--hero-racket-rotate) + 3deg));
+  }
+
+  100% {
+    transform: translateX(var(--tw-translate-x, 0)) rotate(var(--hero-racket-rotate));
+  }
+}
+
 .ps-container {
   width: min(100% - 2rem, 1440px);
   margin-inline: auto;
@@ -269,6 +296,10 @@ select {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .hero-racket-swing {
+    animation: none;
+  }
+
   .metric-bar > span {
     transition: none;
   }
